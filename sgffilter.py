@@ -81,7 +81,7 @@ def process_sgf(path, games_writer, player_files, error_files):
     #   KM[-9]  - 9 komi for black
     if properties.handicap and properties.handicap != '0':
         print(f"Blacklist {path}: handicap {properties.handicap}", file=sys.stderr)
-        error_files["handicap"].write(f"{path},{properties.handicap}\n")
+        error_files["handicap"].write(f"{path},H{properties.handicap}\n")
         return
     if properties.komi not in [6, 6.5, 7, 7.5]:
         print(f"Blacklist {path}: komi {properties.komi}", file=sys.stderr)
