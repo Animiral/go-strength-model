@@ -106,6 +106,8 @@ def process_sgf(path, games_writer, player_files, error_files):
         error_files["length"].write(f"{path},{properties.moves}\n")
         return
 
+    # TODO FILTER: move 2 must not be PASS (improperly specified handicap game records)
+
     # FILTER: only allow ranked games
     #   examples:
     #   GC[correspondence,unranked]  - comment: unranked game
