@@ -11,6 +11,7 @@ The following external dependencies are required:
 * any (KataGo network)[https://katagotraining.org/networks/]
 * my [fork of the goratings repository](https://github.com/Animiral/goratings), originally [here](https://github.com/online-go/goratings)
 * a dataset to work on, like the [OGS 2021 collection](https://archive.org/details/ogs2021)
+* a CUDA compatible graphics card, because the modified KataGo is currently restricted to the CUDA backend
 
 # Dataset Preparation
 
@@ -99,3 +100,26 @@ Run the script as follows.
 ```
 $ python3 label_gameset.py --list games_glicko.csv --output games_labels.csv --advance 10
 ```
+
+# Training
+
+Using the dataset as prepared above, we can train the strength model on it – either from scratch, or by loading an existing model file.
+The strength model is implemented as a modification to KataGo, the C++ program. Note that KataGo, apart from its main program, also consists of Python scripts which are used to train the KataGo model itself. We disregard these training programs, as our training is implemented entirely in C++.
+
+## The Training Command
+
+The modified KataGo version from my fork (see above) implements the new `strength_training` command. Invoke it from the shell like this:
+
+```
+$ KATAGO=path/to/katago
+$ KATA_MODEL=path/to/model.bin.gz
+$ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
+$ CONFIG=configs/strength_analysis_example.cfg
+$ LISTFILE=games_labels.csv
+$ FEATUREDIR=path/to/featurecache
+$ katago strength_training -model $KATA_MODEL -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
+```
+
+Please keep in mind that relative SGF paths in `LISTFILE` must be relative to the current working directory.
+
+Currently, the model is a simple proof of concept. After training completes, the result is saved in the file given as `STRENGTH_MODEL`.
