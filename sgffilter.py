@@ -52,6 +52,7 @@ def parse_sgf_properties(path):
         else:
             return default
 
+    ms = game.get_main_sequence()
     root_node = game.get_root()
     player_white = root_node.get('PW')
     player_black = root_node.get('PB')
@@ -59,11 +60,13 @@ def parse_sgf_properties(path):
     date = get_or_default(root_node, 'DT', '')
     size = root_node.get('SZ')
     handicap = get_or_default(root_node, 'HA', None)
+    if(len(ms) >= 3 and ms[2].get_move()[0] != 'w'):
+        handicap = 'manual'  # games where handicap stones are set as black moves instead of placements
     komi = root_node.get('KM')
     time = root_node.get('TM')
     overtime = get_or_default(root_node, 'OT', None)
     comment = get_or_default(root_node, 'GC', '')
-    moves = len(game.get_main_sequence()) - 1  # move 0 is a node!
+    moves = len(ms) - 1  # move 0 is a node!
     return SgfProperties(player_white, player_black, result, date, size, handicap, komi, time, overtime, comment, moves)
 
 def process_sgf(path, games_writer, player_files, error_files):
@@ -105,8 +108,6 @@ def process_sgf(path, games_writer, player_files, error_files):
         print(f"Blacklist {path}: {properties.moves} moves", file=sys.stderr)
         error_files["length"].write(f"{path},{properties.moves}\n")
         return
-
-    # TODO FILTER: move 2 must not be PASS (improperly specified handicap game records)
 
     # FILTER: only allow ranked games
     #   examples:
