@@ -4,7 +4,7 @@
 import csv
 import math
 
-def main(listpath):
+def main(listpath, setmarker='V'):
     count = 0         # total records
     success = 0       # correctly predicted game result
     zeroinfo = 0      # number of records with first occurrence of both players
@@ -25,7 +25,15 @@ def main(listpath):
         if "Judgement" in reader.fieldnames:
             winner_title = "Judgement"  # override column for result given by SGF
 
+        if "Set" in reader.fieldnames and '*' != setmarker:
+            isSelected = lambda r: setmarker == r["Set"]
+        else:
+            isSelected = lambda _: True
+
         for row in reader:
+            if not isSelected(row):
+                continue
+
             player_white = row['Player White']
             player_black = row['Player Black']
             winner = row[winner_title].lower()
@@ -65,7 +73,11 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Calculate the prediction success rate and log-likelihood of a rating system run record CSV.")
     parser.add_argument("list", type=str, help='Path to the CSV file listing the games, results and winrate.')
+    parser.add_argument("-m", "--setmarker", type=str, default="*", help='Calculate on "T": training set, "V": validation set, "E": test set, "*": all')
     args = parser.parse_args()
 
-    main(args.list)
+    if args.setmarker not in ['T', 'V', 'E', '*']:
+        raise ValueError("Set marker must be one of 'T', 'V', 'E', '*'.")
+
+    main(args.list, args.setmarker)
 

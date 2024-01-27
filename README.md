@@ -32,7 +32,12 @@ In this optional step, we override the specified winner of each game in the list
 The forked KataGo repository contains the script `judge_gameset.py`, which can read our prepared `games.csv` and output a new list with predicted winners.
 
 ```
-$ python3 path/to/katago/python/judge_gameset.py -katago-path path/to/katago/cpp/katago -config-path path/to/katago/cpp/configs/analysis_example.cfg -model-path path/to/model.bin.gz -i games.csv -o games_judged.csv
+$ KATAGO=~/source/katago/cpp/katago
+$ CONFIG=~/source/katago/cpp/configs/analysis_example.cfg
+$ MODEL=~/source/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
+$ LIST=games.csv
+$ OUTLIST=games_judged2.csv
+$ python3 ~/source/katago/python/judge_gameset.py -katago-path $KATAGO -config-path $CONFIG -model-path $MODEL -i $LIST -o $OUTLIST
 ```
 
 ## Glicko2 Calculation
@@ -106,20 +111,48 @@ $ python3 label_gameset.py --list games_glicko.csv --output games_labels.csv --a
 Using the dataset as prepared above, we can train the strength model on it – either from scratch, or by loading an existing model file.
 The strength model is implemented as a modification to KataGo, the C++ program. Note that KataGo, apart from its main program, also consists of Python scripts which are used to train the KataGo model itself. We disregard these training programs, as our training is implemented entirely in C++.
 
+## Splitting the Dataset
+
+The script `random_split.py` reads a CSV file and adds or modifies the "Set" column, which marks each row as a member in one of three sets: "T" for the *training set*, "V" for the *validation set* and "E" for the *test set*. The markers are distributed randomly with prevalence according to user-defined "fraction" parameters.
+
+The motivation behind assigning rows to sets instead of splitting the entire match pool is that if we just form distinct pools from the original one, we tear apart player's rating histories, depriving our algorithms of the data from which they derive their predictions. Instead, we keep them in the same pool. In the training process, we train only on training matches and test only on test matches, while the combined match data is available in the rating history. This technique stems from link prediction problems in social networks, where random test edges are removed from the full graph and later predicted by the model trained on the remaining edges.
+
+Run the set assignment script as follows.
+
+```
+$ python3 random_split.py --input games_labels.csv --output games_labels.csv --trainingFraction 0.8 --validationFraction 0.1
+```
+
+This will allocate 80% of all rows to the training set, 10% to the validation set and the remaining 10% to the test set.
+
+Once allocated, the script can also copy the same set markers to a different CSV file, as long as the "copy-from" file has both "File" and "Set" headers and holds the information on every "File" listed in the input CSV file:
+
+```
+$ python3 random_split.py --input games_strmodel.csv --copy games_labels.csv
+```
+
 ## The Training Command
 
 The modified KataGo version from my fork (see above) implements the new `strength_training` command. Invoke it from the shell like this:
 
 ```
 $ KATAGO=path/to/katago
-$ KATA_MODEL=path/to/model.bin.gz
 $ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
 $ CONFIG=configs/strength_analysis_example.cfg
 $ LISTFILE=games_labels.csv
 $ FEATUREDIR=path/to/featurecache
-$ katago strength_training -model $KATA_MODEL -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
+$ katago strength_training -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
 ```
 
 Please keep in mind that relative SGF paths in `LISTFILE` must be relative to the current working directory.
+If the `LISTFILE` contains the "Set" column from the previous step, the matches will be used according to their designation. The program trains the model on training matches, reporting progress on the training and validation sets after every epoch.
 
 Currently, the model is a simple proof of concept. After training completes, the result is saved in the file given as `STRENGTH_MODEL`.
+
+# Tests
+
+The modified katago features new tests for the new functionality.
+
+```
+$ katago runstrengthmodeltests
+```
