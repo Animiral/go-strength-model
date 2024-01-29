@@ -1,4 +1,4 @@
-This repository contains scripts and material for my strength model based on KataGo, which is the subject of my master thesis.
+This repository contains scripts, utilities and material for my strength model based on KataGo, which is the subject of my master thesis.
 
 The strength model is a neural network model which uses the existing KataGo infrastructure and a new additional strength head component to predict players' strength rating from recent moves played. This document gives you step-by-step instructions for training and running the strength model.
 
@@ -115,6 +115,59 @@ Run the script as follows.
 
 ```
 $ python3 label_gameset.py --list games_glicko.csv --output games_labels.csv --advance 10
+```
+
+## Dataset Viewer
+
+`datasetviewer` is a utility program that allows us to query data from the dataset. It must be compiled from its C++ sources, located in this repository in the `datasetviewer` subdirectory.
+
+```
+$ cd datasetviewer
+$ cmake .
+$ make
+```
+
+Start the program with the dataset list file (generated following the previous sections) and feature cache directory as arguments. If those arguments are not provided, `datasetviewer` explains itself.
+
+```
+Usage: datasetviewer LIST_FILE FEATURE_DIR
+  View data from the games in the LIST_FILE, with precomputed features stored in FEATURE_DIR.
+Commands:
+  help                               Print this help.
+  info                               Print active settings and filters.
+  exit                               Exit program.
+  select PROPERTY OP VALUE|RANGE     Set the filter.
+    PROPERTY choices: none|#|file|black|white|score|predscore|set
+    OP choices: in|contains
+    ex: select # in 10-100         (select match records 10-100)
+    ex: select black contains tom  (select match records where tom plays black)
+  configure SETTING VALUE            Configure a global setting.
+    SETTING choices: window
+    ex: configure window 100       (limit recent moves set to 100 moves)
+  print ENTRY...                     Write the values to stdout.
+  dump FILE ENTRY...                 Write the values to FILE.
+    ENTRY choices: #|file|black|white|score|predscore|set|black_recentmoves|white_recentmoves
+```
+
+For example, in the following session, we extract recent move data for game 11 in the dataset.
+
+```
+$ VIEWERDIR=datasetviewer
+$ LIST=games_labels.csv
+$ FEATUREDIR=featurecache
+$ $VIEWERDIR/datasetviewer $LIST $FEATUREDIR
+Dataset Viewer: 1890 games read from games_labels.csv (with features), ready.
+> select # in 11
+Ok.
+> dump recent_black_11.csv black_recentmoves
+Write to recent_black_11.csv...
+Done.
+> dump recent_white_11.csv white_recentmoves
+Write to recent_white_11.csv...
+Done.
+> exit 
+Dataset Viewer: bye!
+$ 
 ```
 
 # Training

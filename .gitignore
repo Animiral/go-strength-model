@@ -2,6 +2,7 @@
 dataset/
 player/
 featurecache/
+datasetviewer/
 games*.csv
 
 # Byte-compiled / optimized / DLL files

@@ -1,3 +1,5 @@
+#include "global.h"
+#include "dataset.h"
 #include <vector>
 #include <string>
 #include <ranges>
@@ -12,6 +14,7 @@
 #include <cerrno>
 #include <cstring>
 
+using Global::strprintf;
 using std::cout;
 using std::size_t;
 using std::vector;
@@ -19,9 +22,6 @@ using std::string;
 using std::ranges::find;
 using std::istringstream;
 
-std::ostream& strprintf(std::ostream& stream, const char* fmt, std::va_list ap);
-std::ostream& strprintf(std::ostream& stream, const char* fmt, ...);
-template<class T> bool contains(std::initializer_list<T> list, const T& value);
 void help_command();
 void info_command();
 void select_command(istringstream& args);
@@ -29,15 +29,16 @@ void configure_command(istringstream& args);
 void print_command(istringstream& args);
 void dump_command(istringstream& args);
 
-enum class Entry { all, rownum, file, black, white, score, predscore, set, recentmoves };
+enum class Entry { rownum, file, black, white, score, predscore, set, black_recentmoves, white_recentmoves };
 enum class Property { none, rownum, file, black, white, score, predscore, set };
 
 bool parse_entry(const string& input, Entry& entry);
 bool is_numeric_property(Property property);
 bool parse_property(const string& input, Property& property);
+string recentmoves_string(size_t player, size_t game, char delim);
+string selection_string(size_t rownum, const vector<Entry>& entries, char delim);
 
 struct Selection {
-  Entry entry; // what to extract
   struct {
     Property property; // condition on this property
     string pattern; // if string property: match if it contains the pattern as substring
@@ -45,21 +46,24 @@ struct Selection {
   } filter;
 } selection;
 
-struct {
+struct Config {
   size_t window = 1000;
 } config;
 
 string listpath;
+Dataset dataset;
 
 int main(int argc, char* argv[]) {
-  if(3 != argc) {
+  if(2 != argc && 3 != argc) {
     help_command();
     return EXIT_FAILURE;
   }
 
   listpath = argv[1];
-  string featuredir = argv[2];
-  strprintf(cout, "Dataset Viewer: **** games read from %s, ready.\n", listpath.c_str());
+  string featuredir = argc > 2 ? argv[2] : "";
+  dataset.load(listpath, featuredir);
+  strprintf(cout, "Dataset Viewer: %d games read from %s (%s features), ready.\n",
+    dataset.games.size(), listpath.c_str(), featuredir.empty() ? "no" : "with");
 
   string line;
   while(cout << "> ", std::getline(std::cin, line)) {
@@ -84,39 +88,6 @@ int main(int argc, char* argv[]) {
   return EXIT_SUCCESS;
 }
 
-std::ostream& strprintf(std::ostream& stream, const char* fmt, std::va_list ap) {
-  std::va_list ap_copy;
-  va_copy(ap_copy, ap);
-  int size = vsnprintf(nullptr, 0, fmt, ap_copy);
-  va_end(ap_copy);
-
-  if (size < 0) {
-    std::cerr << "Error: " << std::strerror(errno) << std::endl;
-    std::abort();
-  }
-
-  string buffer(size + 1, '\0');
-  vsnprintf(buffer.data(), buffer.size(), fmt, ap);
-  return stream << buffer;
-}
-
-std::ostream& strprintf(std::ostream& stream, const char* fmt, ...) {
-  std::va_list ap;
-  va_start(ap, fmt);
-  std::ostream& retstream = strprintf(stream, fmt, ap);
-  va_end(ap);
-  return retstream;
-}
-
-template<class T>
-bool contains(std::initializer_list<T> list, const T& value) {
-  for(auto it = list.begin(), end = list.end(); it != end; ++it) {
-    if(value == *it)
-      return true;
-  }
-  return false;
-}
-
 void help_command() {
   cout << "Usage: datasetviewer LIST_FILE FEATURE_DIR\n"
     "  View data from the games in the LIST_FILE, with precomputed features stored in FEATURE_DIR.\n"
@@ -134,11 +105,11 @@ void help_command() {
     "    ex: configure window 100       (limit recent moves set to 100 moves)\n"
     "  print ENTRY...                     Write the values to stdout.\n"
     "  dump FILE ENTRY...                 Write the values to FILE.\n"
-    "    ENTRY choices: all|#|file|black|white|score|predscore|set|recentmoves\n";
+    "    ENTRY choices: #|file|black|white|score|predscore|set|black_recentmoves|white_recentmoves\n";
 }
 
 void info_command() {
-  strprintf(cout, "Dataset Viewer: **** games read from %s.\n", listpath.c_str());
+  strprintf(cout, "Dataset Viewer: %d games read from %s.\n", dataset.games.size(), listpath.c_str());
   strprintf(cout, "Configuration:\n  window = %d\n", config.window);
   string propertystr = vector<string>({"none", "#", "file", "black", "white", "score", "predscore", "set"})
     [static_cast<size_t>(selection.filter.property)];
@@ -245,15 +216,18 @@ void print_command(istringstream& args) {
     return;
   }
 
+  vector<Entry> entries;
   do {
     Entry entry;
     if(!parse_entry(entrystr, entry))
       continue;
-
-    // TODO!
-    cout << "PRINT entry: " << entrystr << "\n";
+    entries.push_back(entry);
   }
   while(args >> entrystr);
+
+  for(size_t i = 0; i < dataset.games.size(); i++) {
+    cout << selection_string(i, entries, ' ');
+  }
 }
 
 void dump_command(istringstream& args) {
@@ -271,26 +245,29 @@ void dump_command(istringstream& args) {
   }
   strprintf(cout, "Write to %s...\n", filepath.c_str());
 
+  vector<Entry> entries;
   do {
     Entry entry;
     if(!parse_entry(entrystr, entry))
       continue;
-
-    // TODO!
-    cout << "DUMP entry: " << entrystr << "\n";
+    entries.push_back(entry);
   }
   while(args >> entrystr);
+
+  for(size_t i = 0; i < dataset.games.size(); i++) {
+    ostrm << selection_string(i, entries, ',');
+  }
 
   ostrm.close();
   cout << "Done.\n";
 }
 
 bool parse_entry(const string& input, Entry& entry) {
-  vector<string> entries = { "all", "#", "file", "black", "white", "score", "predscore", "set", "recentmoves" };
+  vector<string> entries = { "#", "file", "black", "white", "score", "predscore", "set", "black_recentmoves", "white_recentmoves" };
   auto entit = find(entries, input);
   if(entries.end() == entit) {
     strprintf(cout, "Unknown entry: %s.\n"
-      "ENTRY choices: all|#|file|black|white|score|predscore|set|recentmoves\n", input.c_str());
+      "ENTRY choices: #|file|black|white|score|predscore|set|black_recentmoves|white_recentmoves\n", input.c_str());
     return false;
   }
   entry = static_cast<Entry>(entit - entries.begin());
@@ -311,4 +288,57 @@ bool parse_property(const string& input, Property& property) {
   }
   property = static_cast<Property>(propit - properties.begin());
   return true;
+}
+
+string recentmoves_string(size_t player, size_t game, char delim) {
+  vector<MoveFeatures> buffer(config.window);
+  buffer.resize(dataset.getRecentMoves(player, game, buffer.data(), config.window));
+  std::ostringstream oss;
+  for(MoveFeatures& mf : buffer) {
+    strprintf(oss, "%f%c%f%c%f%c%f%c%f%c%f\n",
+      mf.winProb, delim, mf.lead, delim, mf.movePolicy, delim,
+      mf.maxPolicy, delim, mf.winrateLoss, delim, mf.pointsLoss);
+  }
+  return oss.str();
+}
+
+string selection_string(size_t rownum, const vector<Entry>& entries, char delim) {
+  const Dataset::Game& game = dataset.games[rownum];
+
+  auto numcheck = [](float n){ return n >= selection.filter.min && n <= selection.filter.max; };
+  auto strcheck = [](const string& s){ return s.contains(selection.filter.pattern); };
+
+  switch(selection.filter.property) {
+  case Property::none: default: break;
+  case Property::rownum: if(numcheck(rownum)) break; else return "";
+  case Property::file: if(strcheck(game.sgfPath)) break; else return "";
+  case Property::black: if(strcheck(dataset.players[game.black.player].name)) break; else return "";
+  case Property::white: if(strcheck(dataset.players[game.white.player].name)) break; else return "";
+  case Property::score: if(numcheck(game.score)) break; else return "";
+  case Property::predscore: if(numcheck(game.prediction.score)) break; else return "";
+  case Property::set: if(strcheck(string("TVBE"+game.set, 1))) break; else return "";
+  }
+
+  std::ostringstream oss;
+  bool first = true;
+  for(Entry entry : entries) {
+    if(!first)
+      oss << delim;
+    first = false;
+
+    switch(entry) {
+    case Entry::rownum: oss << rownum; break;
+    case Entry::file: oss << game.sgfPath.c_str(); break;
+    case Entry::black: oss << dataset.players[game.black.player].name.c_str(); break;
+    case Entry::white: oss << dataset.players[game.white.player].name.c_str(); break;
+    case Entry::score: oss << game.score; break;
+    case Entry::predscore: oss << game.prediction.score; break;
+    case Entry::set: oss << "TVBE"[game.set]; break;
+    case Entry::black_recentmoves: oss << recentmoves_string(game.black.player, rownum, delim); break;
+    case Entry::white_recentmoves: oss << recentmoves_string(game.white.player, rownum, delim); break;
+    default: oss << "(unspecified entry)";
+    }
+  }
+  oss << "\n";
+  return oss.str();
 }
