@@ -56,21 +56,32 @@ Since the scripts in goratings use integer IDs for games and players, we need to
 $ python3 name_ratings.py --list games_judged.csv --ratings games_glicko_ids.csv --output games_glicko.csv
 ```
 
+## Move Feature Precomputation
+
+Move features are the outputs of the KataGo network and inputs to the strength model. Since the KataGo network is static for us, while the strength model is trained, it saves time to do this expensive precomputation just once. Launch the command to precompute all features for every game in a list file and write them to feature files in a dedicated directory as follows:
+
+```
+$ KATA_MODEL=path/to/model.bin.gz
+$ FEATUREDIR=path/to/featurecache
+$ katago extract_features -model $KATA_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
+```
+
+TODO: actually implement this
+
 ## Strength Model Calculation
 
 Once the strength model is trained, we can apply it to a dataset by invoking the modified KataGo (needs to be compiled from my fork, see above) with the `rating_system` command.
 
 ```
-$ KATA_MODEL=path/to/model.bin.gz
 $ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
 $ CONFIG=configs/analysis_example.cfg
 $ LISTFILE=games_judged.csv
 $ OUTFILE=games_strmodel.csv
 $ FEATUREDIR=path/to/featurecache
-$ katago rating_system -model $KATA_MODEL -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -outlist $OUTFILE -featuredir $FEATUREDIR
+$ katago rating_system -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -outlist $OUTFILE -featuredir $FEATUREDIR -set V
 ```
 
-The `-featuredir` is optional, but if we expect to run this command more than once, then the extracted move features will be dumped in this directory, where they can be quickly retrieved in the future. Move features are the outputs of the KataGo network and inputs to the strength model. Since the KataGo network is static for us, while the strength model is trained, it saves time to do this expensive precomputation just once.
+The `-featuredir` is mandatory and must hold the precomputed extracted move features for every game. These must be prepared by `extract_features` as outlined above.
 
 The output file contains the results of the rating calculation, directly comparable to the output of the Glicko2 analysis script above.
 
