@@ -4,6 +4,40 @@
 import csv
 import math
 
+def getScore(row):
+    if "Score" in row.keys():
+        return float(row["Score"])
+    elif "Winner" in row.keys():
+        winner = row["Winner"]
+    elif "Judgement" in row.keys():
+        winner = row["Judgement"]
+
+    w = winner[0].lower()
+    return 1 if 'b' == w else 0
+
+def getPredScore(row):
+    if "PredictedScore" in row.keys():
+        ps = float(row["PredictedScore"])
+    else:
+        ps = 1 - float(row['WhiteWinrate'])
+
+    if math.isnan(ps):
+        ps = 0.5
+
+    return ps
+
+def isSelected(row, setmarker):
+    if "Set" in row.keys() and '*' != setmarker:
+        return setmarker == row["Set"]
+    else:
+        return True
+
+def tolerant_log(x): # accepts x=0 and outputs -inf instead of ValueError
+    if 0 == x:
+        return -math.inf
+    else:
+        return math.log(x)
+
 def main(listpath, setmarker='V'):
     count = 0         # total records
     success = 0       # correctly predicted game result
@@ -20,32 +54,21 @@ def main(listpath, setmarker='V'):
     # Input CSV format (title row):
     # File,Player White,Player Black,Winner,WhiteWinrate,BlackRating,WhiteRating
     with open(listpath, 'r') as infile:
-        reader = csv.DictReader(infile)
-        winner_title = "Winner"
-        if "Judgement" in reader.fieldnames:
-            winner_title = "Judgement"  # override column for result given by SGF
-
-        if "Set" in reader.fieldnames and '*' != setmarker:
-            isSelected = lambda r: setmarker == r["Set"]
-        else:
-            isSelected = lambda _: True
-
-        for row in reader:
-            if not isSelected(row):
+        for row in csv.DictReader(infile):
+            if not isSelected(row, setmarker):
                 continue
 
             player_white = row['Player White']
             player_black = row['Player Black']
-            winner = row[winner_title].lower()
-            winner_black = 'b' == winner[0]
-            winner_white = 'w' == winner[0]
-            winrate = float(row['WhiteWinrate'])
-            if math.isnan(winrate):
-                winrate = 0.5
-            row_success = (winrate > 0.50001 and winner_white) or (winrate < 0.49999 and winner_black)
+            score = getScore(row)
+            predScore = getPredScore(row)
+            if score > 0.5: # black win
+                row_success = predScore > 0.5
+            else: # white win
+                row_success = predScore <= 0.5 # a dead center pred. counts as white due to a priori chance
             row_withinfo = player_white in players or player_black in players
             row_fullinfo = player_white in players and player_black in players
-            row_logp = float(winner_black) * math.log(1.-winrate) + float(winner_white) * math.log(winrate)
+            row_logp = tolerant_log(1.-abs(score-predScore))
 
             count = count + 1
             success = success + int(row_success)
@@ -53,13 +76,13 @@ def main(listpath, setmarker='V'):
             oneinfo = oneinfo + int(row_withinfo and not row_fullinfo)
             success_withinfo = success_withinfo + int(row_success and row_withinfo)
             success_fullinfo = success_fullinfo + int(row_success and row_fullinfo)
-            noresult = noresult + int(not winner_black and not winner_white)
-            if winner_black or winner_white:
-                logp = logp + row_logp
-                if row_withinfo:
-                    logp_withinfo = logp_withinfo + row_logp
-                if row_fullinfo:
-                    logp_fullinfo = logp_fullinfo + row_logp
+            # noresult = noresult + int(not winner_black and not winner_white)
+            # if winner_black or winner_white:
+            logp = logp + row_logp
+            if row_withinfo:
+                logp_withinfo = logp_withinfo + row_logp
+            if row_fullinfo:
+                logp_fullinfo = logp_fullinfo + row_logp
 
             players.add(player_white)
             players.add(player_black)
