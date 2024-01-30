@@ -205,4 +205,12 @@ bool contains(const std::vector<A>& vec, const A& elt)
 //   return m.find(std::string(key)) != m.end();
 // }
 
+template<typename A>
+void append(std::vector<A>& lhs, const std::vector<A>& rhs, int count = -1)
+{
+  if(count < 0)
+    count = rhs.size();
+  lhs.insert(lhs.end(), rhs.begin(), rhs.begin() + count);
+}
+
 #endif  // GLOBAL_H_
