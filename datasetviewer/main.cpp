@@ -42,7 +42,6 @@ bool is_numeric_filter(GameFilter filter);
 bool is_numeric_filter(MoveFilter filter);
 bool parse_filter(const string& input, GameFilter& filter);
 bool parse_filter(const string& input, MoveFilter& filter);
-string recentmoves_string(size_t player, size_t game, char delim);
 string column_string(size_t rownum, const vector<GameColumn>& entries, char delim);
 string column_string(MoveFeatures move, const vector<MoveColumn>& entries, char delim);
 vector<bool> selected_games();
@@ -272,7 +271,7 @@ void configure_command(istringstream& args) {
   cout << "Ok.\n";
 }
 
-template<class Column> vector<Column> print_command_get_columns(istringstream& args) {
+template<class Column> vector<Column> print_or_dump_command_get_columns(istringstream& args) {
   string columnstr;
   if(!(args >> columnstr)) {
     cout << "I don't understand your input.\n"
@@ -291,11 +290,10 @@ template<class Column> vector<Column> print_command_get_columns(istringstream& a
   return entries; 
 }
 
-void print_command(istringstream& args) {
+void print_or_dump_command(std::ostream& stream, istringstream& args, char delim, const char* syntax_help) {
   string topicstr;
   if(!(args >> topicstr)) {
-    cout << "I don't understand your input.\n"
-      "Syntax: print TOPIC COLUMN...\n";
+    cout << "I don't understand your input.\n" << syntax_help;
     return;
   }
 
@@ -306,14 +304,14 @@ void print_command(istringstream& args) {
   vector<bool> selectedGames = selected_games();
 
   if(Topic::moves == topic) {
-    vector<MoveColumn> entries = print_command_get_columns<MoveColumn>(args);
+    vector<MoveColumn> entries = print_or_dump_command_get_columns<MoveColumn>(args);
     if(entries.empty())
       return;
     vector<MoveFeatures> blackMoves, whiteMoves;
-    for(size_t i = 0; i <= dataset.games.size(); i++) {
+    for(size_t i = 0; i < dataset.games.size(); i++) {
       const Dataset::Game& game = dataset.games[i];
       if(!selectedGames[i])
-        break;
+        continue;
       if(MoveFilter::recent == selection.move.filter) {
         vector<MoveFeatures> buffer(config.window);
         size_t count = dataset.getRecentMoves(game.black.player, i, buffer.data(), config.window);
@@ -328,29 +326,33 @@ void print_command(istringstream& args) {
     }
     if(MoveFilter::color != selection.move.filter || "black" == selection.move.pattern) {
       for(MoveFeatures move : blackMoves)
-        cout << column_string(move, entries, ' ');
+        stream << column_string(move, entries, ' ');
     }
     if(MoveFilter::color != selection.move.filter || "white" == selection.move.pattern) {
       for(MoveFeatures move : whiteMoves)
-        cout << column_string(move, entries, ' ');
+        stream << column_string(move, entries, ' ');
     }
   }
   else {
-    vector<GameColumn> entries = print_command_get_columns<GameColumn>(args);
+    vector<GameColumn> entries = print_or_dump_command_get_columns<GameColumn>(args);
     if(entries.empty())
       return;
     for(size_t i = 0; i < dataset.games.size(); i++) {
       if(selectedGames[i])
-        cout << column_string(i, entries, ' ');
+        stream << column_string(i, entries, ' ');
     }
   }
 }
 
+void print_command(istringstream& args) {
+  print_or_dump_command(cout, args, ' ', "Syntax: print TOPIC COLUMN...\n");
+}
+
 void dump_command(istringstream& args) {
-  string filepath, columnstr;
-  if(!(args >> filepath >> columnstr)) {
-    cout << "I don't understand your input.\n"
-      "Syntax: dump FILE COLUMN...\n";
+  string filepath;
+  const char* syntax_help = "Syntax: dump FILE TOPIC COLUMN...\n";
+  if(!(args >> filepath)) {
+    cout << "I don't understand your input.\n" << syntax_help;
     return;
   }
 
@@ -360,20 +362,7 @@ void dump_command(istringstream& args) {
     return;
   }
   strprintf(cout, "Write to %s...\n", filepath.c_str());
-
-  vector<GameColumn> entries;
-  do {
-    GameColumn column;
-    if(!parse_column(columnstr, column))
-      continue;
-    entries.push_back(column);
-  }
-  while(args >> columnstr);
-
-  for(size_t i = 0; i < dataset.games.size(); i++) {
-    ostrm << column_string(i, entries, ',');
-  }
-
+  print_or_dump_command(ostrm, args, ',', syntax_help);
   ostrm.close();
   cout << "Done.\n";
 }
