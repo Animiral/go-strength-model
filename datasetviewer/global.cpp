@@ -392,33 +392,33 @@ string Global::trim(const std::string &s, const char* delims)
 //   return concat(v,delim,0,v.size());
 // }
 
-// vector<string> Global::split(const string& s, char delim)
-// {
-//   istringstream in(s);
-//   string token;
-//   vector<string> tokens;
-//   while(getline(in,token,delim))
-//     tokens.push_back(token);
-//   return tokens;
-// }
+vector<string> Global::split(const string& s, char delim)
+{
+  istringstream in(s);
+  string token;
+  vector<string> tokens;
+  while(getline(in,token,delim))
+    tokens.push_back(token);
+  return tokens;
+}
 
-// string Global::toUpper(const string& s)
-// {
-//   string t = s;
-//   size_t len = t.length();
-//   for(size_t i = 0; i<len; i++)
-//     t[i] = toupper(t[i]);
-//   return t;
-// }
+string Global::toUpper(const string& s)
+{
+  string t = s;
+  size_t len = t.length();
+  for(size_t i = 0; i<len; i++)
+    t[i] = toupper(t[i]);
+  return t;
+}
 
-// string Global::toLower(const string& s)
-// {
-//   string t = s;
-//   size_t len = t.length();
-//   for(size_t i = 0; i<len; i++)
-//     t[i] = tolower(t[i]);
-//   return t;
-// }
+string Global::toLower(const string& s)
+{
+  string t = s;
+  size_t len = t.length();
+  for(size_t i = 0; i<len; i++)
+    t[i] = tolower(t[i]);
+  return t;
+}
 
 // bool Global::isEqualCaseInsensitive(const string& s0, const string& s1) {
 //   size_t len = s0.length();

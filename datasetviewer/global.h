@@ -87,14 +87,14 @@ namespace Global
 
 //   //Split string into tokens, trimming off whitespace
 //   std::vector<std::string> split(const std::string& s);
-//   //Split string based on the given delim, no trimming
-//   std::vector<std::string> split(const std::string& s, char delim);
+  //Split string based on the given delim, no trimming
+  std::vector<std::string> split(const std::string& s, char delim);
 
-//   //Convert to upper or lower case
-//   std::string toUpper(const std::string& s);
-//   std::string toLower(const std::string& s);
+  //Convert to upper or lower case
+  std::string toUpper(const std::string& s);
+  std::string toLower(const std::string& s);
 
-//   bool isEqualCaseInsensitive(const std::string& s0, const std::string& s1);
+  // bool isEqualCaseInsensitive(const std::string& s0, const std::string& s1);
 
   //Like sprintf, but using strings and streams
   std::string strprintf(const char* fmt, ...);

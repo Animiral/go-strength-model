@@ -133,23 +133,24 @@ Start the program with the dataset list file (generated following the previous s
 Usage: datasetviewer LIST_FILE FEATURE_DIR
   View data from the games in the LIST_FILE, with precomputed features stored in FEATURE_DIR.
 Commands:
-  help                               Print this help.
-  info                               Print active settings and filters.
-  exit                               Exit program.
-  select PROPERTY OP VALUE|RANGE     Set the filter.
-    PROPERTY choices: none|#|file|black|white|score|predscore|set
+  help                                  Print this help.
+  info                                  Print active settings and filters.
+  exit                                  Exit program.
+  select TOPIC FILTER OP VALUE|RANGE    Set the filter for TOPIC.
+    TOPIC choices: games|moves
+    FILTER choices for games: none|#|file|black|white|score|predscore|set
+    FILTER choices for moves: none|recent|color
     OP choices: in|contains
-    ex: select # in 10-100         (select match records 10-100)
-    ex: select black contains tom  (select match records where tom plays black)
-  configure SETTING VALUE            Configure a global setting.
+  configure SETTING VALUE               Configure a global setting.
     SETTING choices: window
-    ex: configure window 100       (limit recent moves set to 100 moves)
-  print ENTRY...                     Write the values to stdout.
-  dump FILE ENTRY...                 Write the values to FILE.
-    ENTRY choices: #|file|black|white|score|predscore|set|black_recentmoves|white_recentmoves
+  print TOPIC COLUMN...                 Write the values to stdout.
+  dump FILE TOPIC COLUMN...             Write the values to FILE.
+    TOPIC choices: games|moves
+    COLUMN choices for games: #|file|black.name|white.name|black.rating|white.rating|score|predscore|set
+    COLUMN choices for moves: #|color|winprob|lead|policy|maxpolicy|wrloss|ploss|rating
 ```
 
-For example, in the following session, we extract recent move data for game 11 in the dataset.
+For example, in the following session, we extract the first 100 matchups, and also recent move data for game 11 in the dataset.
 
 ```
 $ VIEWERDIR=datasetviewer
@@ -157,13 +158,15 @@ $ LIST=games_labels.csv
 $ FEATUREDIR=featurecache
 $ $VIEWERDIR/datasetviewer $LIST $FEATUREDIR
 Dataset Viewer: 1890 games read from games_labels.csv (with features), ready.
-> select # in 11
+> select games # in 0-99
 Ok.
-> dump recent_black_11.csv black_recentmoves
-Write to recent_black_11.csv...
+> dump matches_100.csv games black.name black.rating white.name white.rating
+Write to matches_100.csv...
 Done.
-> dump recent_white_11.csv white_recentmoves
-Write to recent_white_11.csv...
+> select moves recent in 11
+Ok.
+> dump recent_11.csv moves color policy ploss
+Write to recent_11.csv...
 Done.
 > exit 
 Dataset Viewer: bye!

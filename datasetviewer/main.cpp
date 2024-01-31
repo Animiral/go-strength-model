@@ -4,7 +4,6 @@
 #include <string>
 #include <ranges>
 #include <algorithm>
-#include <initializer_list>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -15,6 +14,9 @@
 #include <cstring>
 
 using Global::strprintf;
+using Global::split;
+using Global::toUpper;
+using Global::toLower;
 using std::cout;
 using std::size_t;
 using std::vector;
@@ -30,20 +32,30 @@ void print_command(istringstream& args);
 void dump_command(istringstream& args);
 
 enum class Topic { games, moves };
-enum class GameColumn { rownum, file, black, white, score, predscore, set };
-enum class MoveColumn { rownum, game, color, winprob, lead, policy, maxpolicy, wrloss, ploss };
-enum class GameFilter { none, rownum, file, black, white, score, predscore, set };
+enum class GameColumn { gamenum, file, black_name, white_name, black_rating, white_rating, score, predscore, set };
+enum class MoveColumn { movenum, color, winprob, lead, policy, maxpolicy, wrloss, ploss, rating };
+enum class GameFilter { none, gamenum, file, black, white, score, predscore, set };
 enum class MoveFilter { none, recent, color };
+template<class E> struct EnumStr {};
+#define ENUM_STR(E,N,S) template<> struct EnumStr<E> { using type = E; static string name() { return N; } static string str() { return S; } };
+ENUM_STR(Topic,"TOPIC","games|moves")
+ENUM_STR(GameColumn,"COLUMN","#|file|black.name|white.name|black.rating|white.rating|score|predscore|set")
+ENUM_STR(MoveColumn,"COLUMN","#|color|winprob|lead|policy|maxpolicy|wrloss|ploss|rating")
+ENUM_STR(GameFilter,"FILTER","none|#|file|black|white|score|predscore|set")
+ENUM_STR(MoveFilter,"FILTER","none|recent|color")
 
-bool parse_topic(const string& input, Topic& topic);
-bool parse_column(const string& input, GameColumn& column);
-bool parse_column(const string& input, MoveColumn& column);
+struct Move {
+  size_t gamenum;
+  size_t movenum;
+  char color; // 'b'/'w'
+  MoveFeatures features;
+};
+
+template<class E> bool parse_enum(const string& input, E& topic);
 bool is_numeric_filter(GameFilter filter);
 bool is_numeric_filter(MoveFilter filter);
-bool parse_filter(const string& input, GameFilter& filter);
-bool parse_filter(const string& input, MoveFilter& filter);
-string column_string(size_t rownum, const vector<GameColumn>& entries, char delim);
-string column_string(MoveFeatures move, const vector<MoveColumn>& entries, char delim);
+string column_string(size_t gamenum, const vector<GameColumn>& entries, char delim);
+string column_string(const Move& move, const vector<MoveColumn>& entries, char delim);
 vector<bool> selected_games();
 
 struct Selection {
@@ -83,8 +95,7 @@ int main(int argc, char* argv[]) {
   while(cout << "> ", std::getline(std::cin, line)) {
     istringstream stream(line);
     string command;
-    stream >> command;
-    if(!stream) {
+    if(!(stream >> command)) {
       help_command(stream);
       continue;
     }
@@ -105,9 +116,9 @@ int main(int argc, char* argv[]) {
 void help_command(istringstream& args) {
   const string select_usage =
     "  select TOPIC FILTER OP VALUE|RANGE    Set the filter for TOPIC.\n"
-    "    TOPIC choices: games|moves\n"
-    "    FILTER choices for games: none|#|file|black|white|score|predscore|set\n"
-    "    FILTER choices for moves: none|recent|color\n"
+    "    TOPIC choices: " + EnumStr<Topic>::str() + "\n"
+    "    FILTER choices for games: " + EnumStr<GameFilter>::str() + "\n"
+    "    FILTER choices for moves: " + EnumStr<MoveFilter>::str() + "\n"
     "    OP choices: in|contains\n";
   const string configure_usage =
     "  configure SETTING VALUE               Configure a global setting.\n"
@@ -115,9 +126,9 @@ void help_command(istringstream& args) {
   const string print_usage =
     "  print TOPIC COLUMN...                 Write the values to stdout.\n"
     "  dump FILE TOPIC COLUMN...             Write the values to FILE.\n"
-    "    TOPIC choices: games|moves\n"
-    "    COLUMN choices for games: #|file|black|white|score|predscore|set\n";
-    "    COLUMN choices for moves: #|game|color|winprob|lead|policy|maxpolicy|wrloss|ploss\n";
+    "    TOPIC choices: " + EnumStr<Topic>::str() + "\n"
+    "    COLUMN choices for games: " + EnumStr<GameColumn>::str() + "\n"
+    "    COLUMN choices for moves: " + EnumStr<MoveColumn>::str() + "\n";
   string section;
   if(args >> section) {
     if("select" == section)
@@ -146,33 +157,34 @@ general_help:
   }
 }
 
-void info_command() {
-  auto print_predicate = [](auto&& selection) {
-    if(decltype(selection.filter)::none == selection.filter) {
-      cout << "\n";
+void info_command_predicate(auto& selection) {
+  if(decltype(selection.filter)::none == selection.filter) {
+    cout << "\n";
+  }
+  else {
+    if(is_numeric_filter(selection.filter)) {
+      strprintf(cout, " in %f-%f\n", selection.min, selection.max);
     }
     else {
-      if(is_numeric_filter(selection.filter)) {
-        strprintf(cout, " in %f-%f\n", selection.min, selection.max);
-      }
-      else {
-        strprintf(cout, " contains %s\n", selection.pattern.c_str());
-      }
-    };
+      strprintf(cout, " contains %s\n", selection.pattern.c_str());
+    }
   };
+}
+
+void info_command() {
   strprintf(cout, "Dataset Viewer: %d games read from %s.\n", dataset.games.size(), listpath.c_str());
   strprintf(cout, "Configuration:\n  window = %d\n", config.window);
   string filterstr = vector<string>({"none", "#", "file", "black", "white", "score", "predscore", "set"})
     [static_cast<size_t>(selection.game.filter)];
   strprintf(cout, "Game Filter: %s", filterstr.c_str());
-  print_predicate(selection.game);
+  info_command_predicate(selection.game);
   filterstr = vector<string>({"none", "recent", "color"})
     [static_cast<size_t>(selection.move.filter)];
   strprintf(cout, "Move Filter: %s", filterstr.c_str());
-  print_predicate(selection.move);
+  info_command_predicate(selection.move);
 }
 
-template<class Sel> void select_command_condition(istringstream& args, Sel& selection) {
+void select_command_condition(istringstream& args, auto& selection) {
   string filterstr, op, value;
   if(!(args >> filterstr >> op >> value)) {
     cout << "I don't understand your input.\n"
@@ -186,7 +198,7 @@ template<class Sel> void select_command_condition(istringstream& args, Sel& sele
   }
 
   decltype(selection.filter) filter;
-  if(!parse_filter(filterstr, filter))
+  if(!parse_enum(filterstr, filter))
     return;
 
   string pattern;
@@ -235,12 +247,12 @@ void select_command(istringstream& args) {
   }
 
   Topic topic;
-  if(!parse_topic(topicstr, topic))
+  if(!parse_enum(topicstr, topic))
     return;
 
   if(Topic::moves == topic)
     select_command_condition(args, selection.move);
-  else
+  else  // Topic::games == topic
     select_command_condition(args, selection.game);
 }
 
@@ -282,7 +294,7 @@ template<class Column> vector<Column> print_or_dump_command_get_columns(istrings
   vector<Column> entries;
   do {
     Column column;
-    if(!parse_column(columnstr, column))
+    if(!parse_enum(columnstr, column))
       continue;
     entries.push_back(column);
   }
@@ -298,16 +310,17 @@ void print_or_dump_command(std::ostream& stream, istringstream& args, char delim
   }
 
   Topic topic;
-  if(!parse_topic(topicstr, topic))
+  if(!parse_enum(topicstr, topic))
     return;
 
+  // mask based on games filter, and also on move filter! if "recent" (referring to game #)
   vector<bool> selectedGames = selected_games();
 
   if(Topic::moves == topic) {
     vector<MoveColumn> entries = print_or_dump_command_get_columns<MoveColumn>(args);
     if(entries.empty())
       return;
-    vector<MoveFeatures> blackMoves, whiteMoves;
+    vector<Move> moves;
     for(size_t i = 0; i < dataset.games.size(); i++) {
       const Dataset::Game& game = dataset.games[i];
       if(!selectedGames[i])
@@ -315,25 +328,25 @@ void print_or_dump_command(std::ostream& stream, istringstream& args, char delim
       if(MoveFilter::recent == selection.move.filter) {
         vector<MoveFeatures> buffer(config.window);
         size_t count = dataset.getRecentMoves(game.black.player, i, buffer.data(), config.window);
-        append(blackMoves, buffer, count);
+        for(size_t j = 0; j < count; j++)
+          moves.push_back({i, j, 'b', buffer[j]});
         count = dataset.getRecentMoves(game.white.player, i, buffer.data(), config.window);
-        append(whiteMoves, buffer, count);
+        for(size_t j = 0; j < count; j++)
+          moves.push_back({i, j, 'w', buffer[j]});
       }
       else {
-        append(blackMoves, game.black.features);
-        append(whiteMoves, game.white.features);
+        if(MoveFilter::color != selection.move.filter || "black" == selection.move.pattern)
+          for(size_t j = 0; j < game.black.features.size(); j++)
+            moves.push_back({i, j*2+1, 'b', game.black.features[j]});
+        if(MoveFilter::color != selection.move.filter || "white" == selection.move.pattern)
+          for(size_t j = 0; j < game.white.features.size(); j++)
+            moves.push_back({i, j*2+2, 'w', game.white.features[j]});
       }
     }
-    if(MoveFilter::color != selection.move.filter || "black" == selection.move.pattern) {
-      for(MoveFeatures move : blackMoves)
-        stream << column_string(move, entries, ' ');
-    }
-    if(MoveFilter::color != selection.move.filter || "white" == selection.move.pattern) {
-      for(MoveFeatures move : whiteMoves)
-        stream << column_string(move, entries, ' ');
-    }
+    for(const Move& move : moves)
+      stream << column_string(move, entries, ' ');
   }
-  else {
+  else {  // Topic::games == topic
     vector<GameColumn> entries = print_or_dump_command_get_columns<GameColumn>(args);
     if(entries.empty())
       return;
@@ -367,76 +380,29 @@ void dump_command(istringstream& args) {
   cout << "Done.\n";
 }
 
-bool parse_topic(const string& input, Topic& topic) {
-  vector<string> topics = { "games", "moves" };
-  auto topit = find(topics, input);
-  if(topics.end() == topit) {
-    strprintf(cout, "Unknown topic: %s.\n"
-      "TOPIC choices: games|moves\n", input.c_str());
+template<class E> bool parse_enum(const string& input, E& topic) {
+  vector<string> values = split(EnumStr<E>::str(), '|');
+  auto it = find(values, input);
+  if(values.end() == it) {
+    strprintf(cout, "Unknown %s: %s.\n%s choices: %s\n",
+      toLower(EnumStr<E>::name()).c_str(), input.c_str(),
+      toUpper(EnumStr<E>::name()).c_str(), EnumStr<E>::str().c_str());
     return false;
   }
-  topic = static_cast<Topic>(topit - topics.begin());
-  return true;
-}
-
-bool parse_column(const string& input, GameColumn& column) {
-  vector<string> entries = { "#", "file", "black", "white", "score", "predscore", "set" };
-  auto entit = find(entries, input);
-  if(entries.end() == entit) {
-    strprintf(cout, "Unknown column: %s.\n"
-      "COLUMN choices: #|file|black|white|score|predscore|set\n", input.c_str());
-    return false;
-  }
-  column = static_cast<GameColumn>(entit - entries.begin());
-  return true;
-}
-
-bool parse_column(const string& input, MoveColumn& column) {
-  vector<string> entries = { "rownum", "game", "color", "winprob", "lead", "policy", "maxpolicy", "wrloss", "ploss" };
-  auto entit = find(entries, input);
-  if(entries.end() == entit) {
-    strprintf(cout, "Unknown column: %s.\n"
-      "COLUMN choices: #|game|color|winprob|lead|policy|maxpolicy|wrloss|ploss\n", input.c_str());
-    return false;
-  }
-  column = static_cast<MoveColumn>(entit - entries.begin());
+  topic = static_cast<E>(it - values.begin());
   return true;
 }
 
 bool is_numeric_filter(GameFilter filter) {
-  return contains({GameFilter::rownum, GameFilter::score, GameFilter::predscore}, filter);
+  return contains({GameFilter::gamenum, GameFilter::score, GameFilter::predscore}, filter);
 }
 
 bool is_numeric_filter(MoveFilter filter) {
   return MoveFilter::recent == filter;
 }
 
-bool parse_filter(const string& input, GameFilter& filter) {
-  vector<string> filters = { "none", "#", "file", "black", "white", "score", "predscore", "set" };
-  auto filit = find(filters, input);
-  if(filters.end() == filit) {
-    strprintf(cout, "Unknown filter: %s.\n"
-      "FILTER choices: none|#|file|black|white|score|predscore|set\n", input.c_str());
-    return false;
-  }
-  filter = static_cast<GameFilter>(filit - filters.begin());
-  return true;
-}
-
-bool parse_filter(const string& input, MoveFilter& filter) {
-  vector<string> filters = { "none", "recent", "color" };
-  auto filit = find(filters, input);
-  if(filters.end() == filit) {
-    strprintf(cout, "Unknown filter: %s.\n"
-      "FILTER choices: none|recent|color\n", input.c_str());
-    return false;
-  }
-  filter = static_cast<MoveFilter>(filit - filters.begin());
-  return true;
-}
-
-string column_string(size_t rownum, const vector<GameColumn>& entries, char delim) {
-  const Dataset::Game& game = dataset.games[rownum];
+string column_string(size_t gamenum, const vector<GameColumn>& entries, char delim) {
+  const Dataset::Game& game = dataset.games[gamenum];
   std::ostringstream oss;
   bool first = true;
   for(GameColumn column : entries) {
@@ -445,10 +411,12 @@ string column_string(size_t rownum, const vector<GameColumn>& entries, char deli
     first = false;
 
     switch(column) {
-    case GameColumn::rownum: oss << rownum; break;
+    case GameColumn::gamenum: oss << gamenum; break;
     case GameColumn::file: oss << game.sgfPath.c_str(); break;
-    case GameColumn::black: oss << dataset.players[game.black.player].name.c_str(); break;
-    case GameColumn::white: oss << dataset.players[game.white.player].name.c_str(); break;
+    case GameColumn::black_name: oss << dataset.players[game.black.player].name.c_str(); break;
+    case GameColumn::white_name: oss << dataset.players[game.white.player].name.c_str(); break;
+    case GameColumn::black_rating: oss << game.black.rating; break;
+    case GameColumn::white_rating: oss << game.white.rating; break;
     case GameColumn::score: oss << game.score; break;
     case GameColumn::predscore: oss << game.prediction.score; break;
     case GameColumn::set: oss << "TVBE"[game.set]; break;
@@ -459,7 +427,7 @@ string column_string(size_t rownum, const vector<GameColumn>& entries, char deli
   return oss.str();
 }
 
-string column_string(MoveFeatures move, const vector<MoveColumn>& entries, char delim) {
+string column_string(const Move& move, const vector<MoveColumn>& entries, char delim) {
   std::ostringstream oss;
   bool first = true;
   for(MoveColumn column : entries) {
@@ -468,15 +436,19 @@ string column_string(MoveFeatures move, const vector<MoveColumn>& entries, char 
     first = false;
 
     switch(column) {
-    case MoveColumn::winprob: oss << move.winProb; break;
-    case MoveColumn::lead: oss << move.lead; break;
-    case MoveColumn::policy: oss << move.movePolicy; break;
-    case MoveColumn::maxpolicy: oss << move.maxPolicy; break;
-    case MoveColumn::wrloss: oss << move.winrateLoss; break;
-    case MoveColumn::ploss: oss << move.pointsLoss; break;
-    case MoveColumn::rownum:  // not implemented
-    case MoveColumn::game:  // not implemented
-    case MoveColumn::color:  // not implemented
+    case MoveColumn::movenum: oss << move.movenum; break;
+    case MoveColumn::color: oss << move.color; break;
+    case MoveColumn::winprob: oss << move.features.winProb; break;
+    case MoveColumn::lead: oss << move.features.lead; break;
+    case MoveColumn::policy: oss << move.features.movePolicy; break;
+    case MoveColumn::maxpolicy: oss << move.features.maxPolicy; break;
+    case MoveColumn::wrloss: oss << move.features.winrateLoss; break;
+    case MoveColumn::ploss: oss << move.features.pointsLoss; break;
+    case MoveColumn::rating:
+      oss << ('b' == move.color
+        ? dataset.games[move.gamenum].black.rating
+        : dataset.games[move.gamenum].white.rating);
+    break;
     default: oss << "(unspecified column)";
     }
   }
@@ -494,7 +466,7 @@ vector<bool> selected_games() {
 
     bool s = true;
     switch(selection.game.filter) {
-    case GameFilter::rownum: if(!numcheck(i)) s = false; break;
+    case GameFilter::gamenum: if(!numcheck(i)) s = false; break;
     case GameFilter::file: if(!strcheck(game.sgfPath)) s = false; break;
     case GameFilter::black: if(!strcheck(dataset.players[game.black.player].name)) s = false; break;
     case GameFilter::white: if(!strcheck(dataset.players[game.white.player].name)) s = false; break;
