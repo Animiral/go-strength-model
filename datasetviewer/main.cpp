@@ -344,7 +344,7 @@ void print_or_dump_command(std::ostream& stream, istringstream& args, char delim
       }
     }
     for(const Move& move : moves)
-      stream << column_string(move, entries, ' ');
+      stream << column_string(move, entries, delim);
   }
   else {  // Topic::games == topic
     vector<GameColumn> entries = print_or_dump_command_get_columns<GameColumn>(args);
@@ -352,7 +352,7 @@ void print_or_dump_command(std::ostream& stream, istringstream& args, char delim
       return;
     for(size_t i = 0; i < dataset.games.size(); i++) {
       if(selectedGames[i])
-        stream << column_string(i, entries, ' ');
+        stream << column_string(i, entries, delim);
     }
   }
 }

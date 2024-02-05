@@ -13,7 +13,13 @@ def getScore(row):
         winner = row["Judgement"]
 
     w = winner[0].lower()
-    return 1 if 'b' == w else 0
+    if 'b' == w:
+        return 1
+    elif 'w' == w:
+        return 0
+    else:
+        print(f"Warning! Undecided game in dataset: {row['File']}")
+        return 0.5  # Jigo and undecided cases
 
 def getPredScore(row):
     if "PredictedScore" in row.keys():
@@ -87,10 +93,16 @@ def main(listpath, setmarker='V'):
             players.add(player_white)
             players.add(player_black)
 
+    count_withinfo = count - zeroinfo
+    count_fullinfo = count - zeroinfo - oneinfo
+    logp /= count
+    logp_withinfo /= count_withinfo
+    logp_fullinfo /= count_fullinfo
+
     print(f"Finished counting run of {count} matchups between {len(players)} players.")
     print(f"Prediction accuracy: {success}/{count} ({success/count:.3f}), logp: {logp}")
-    print(f"Without zero-info matchups: {success_withinfo}/{count-zeroinfo} ({success_withinfo/(count-zeroinfo):.3f}), logp: {logp_withinfo}")
-    print(f"Only both-rated matchups: {success_fullinfo}/{count-zeroinfo-oneinfo} ({success_fullinfo/(count-zeroinfo-oneinfo):.3f}), logp: {logp_fullinfo}")
+    print(f"Without zero-info matchups: {success_withinfo}/{count_withinfo} ({success_withinfo/(count_withinfo):.3f}), logp: {logp_withinfo}")
+    print(f"Only both-rated matchups: {success_fullinfo}/{count_fullinfo} ({success_fullinfo/count_fullinfo:.3f}), logp: {logp_fullinfo}")
 
 if __name__ == "__main__":
     import argparse

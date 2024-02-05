@@ -2,6 +2,8 @@ This repository contains scripts, utilities and material for my strength model b
 
 The strength model is a neural network model which uses the existing KataGo infrastructure and a new additional strength head component to predict players' strength rating from recent moves played. This document gives you step-by-step instructions for training and running the strength model.
 
+Python scripts are located in the `python` subdirectory. By convention, we dump CSV files in the `csv` subdirectory, which you may need to create first.
+
 # External Resources
 
 The following external dependencies are required:
@@ -22,7 +24,7 @@ We start by preparing the games which we want to use in training. We assume that
 The `sgffilter.py` script provided in this repository traverses a given directory and all its subdirectories for SGF files. Every file that contains a suitable training game is printed to the output file. Suitable games are no-handicap even 19x19 games with more than 5 seconds per move to think, have at least 20 moves played, were decided by either counting, resignation or timeout, and contain the string "ranked" (and not "unranked") in the GC property.
 
 ```
-$ python3 sgffilter.py path/to/dataset more/paths/to/datasets --output games.csv
+$ python3 python/sgffilter.py path/to/dataset more/paths/to/datasets --output csv/games.csv
 ```
 
 ## Judging Games
@@ -35,8 +37,8 @@ The forked KataGo repository contains the script `judge_gameset.py`, which can r
 $ KATAGO=~/source/katago/cpp/katago
 $ CONFIG=~/source/katago/cpp/configs/analysis_example.cfg
 $ MODEL=~/source/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
-$ LIST=games.csv
-$ OUTLIST=games_judged2.csv
+$ LIST=csv/games.csv
+$ OUTLIST=csv/games_judged2.csv
 $ python3 ~/source/katago/python/judge_gameset.py -katago-path $KATAGO -config-path $CONFIG -model-path $MODEL -i $LIST -o $OUTLIST
 ```
 
@@ -47,13 +49,13 @@ We feed our dataset(s) into our reference rating algorithm Glicko2, which is imp
 ```
 $ GORATINGS_DIR=path/to/goratings
 $ PYTHONPATH="$PYTHONPATH:$GORATINGS_DIR" python3 $GORATINGS_DIR/analysis/analyze_glicko2_one_game_at_a_time.py \
-	--sgf games_judged.csv --analysis-outfile games_glicko_ids.csv --mass-timeout-rule false
+	--sgf csv/games_judged.csv --analysis-outfile csv/games_glicko_ids.csv --mass-timeout-rule false
 ```
 
 Since the scripts in goratings use integer IDs for games and players, we need to run our `name_ratings.py` script to restore SGF paths and player names.
 
 ```
-$ python3 name_ratings.py --list games_judged.csv --ratings games_glicko_ids.csv --output games_glicko.csv
+$ python3 python/name_ratings.py --list csv/games_judged.csv --ratings csv/games_glicko_ids.csv --output csv/games_glicko.csv
 ```
 
 ## Move Feature Precomputation
@@ -75,8 +77,8 @@ Once the strength model is trained, we can apply it to a dataset by invoking the
 ```
 $ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
 $ CONFIG=configs/analysis_example.cfg
-$ LISTFILE=games_judged.csv
-$ OUTFILE=games_strmodel.csv
+$ LISTFILE=csv/games_judged.csv
+$ OUTFILE=csv/games_strmodel.csv
 $ FEATUREDIR=path/to/featurecache
 $ katago rating_system -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -outlist $OUTFILE -featuredir $FEATUREDIR -set V
 ```
@@ -93,7 +95,7 @@ We measure the success rate as the number of successful predictions divided by t
 Given a rating calculation file like `games_glicko.csv` or `games_strmodel.csv` in the examples above, that contains the Winner and WhiteWinrate of every game, the script `calc_performance.py` tells us the success rate and log-likelihood achieved by the system. It also counts with and without games involving new players, who come into the system with no prior information.
 
 ```
-$ python3 calc_performance.py games_strmodel.csv
+$ python3 python/calc_performance.py csv/games_strmodel.csv
 ```
 
 ## Labeling Games
@@ -114,7 +116,7 @@ Alice_vs_F.sgf,Alice,F,W+,1500,1000
 Run the script as follows.
 
 ```
-$ python3 label_gameset.py --list games_glicko.csv --output games_labels.csv --advance 10
+$ python3 python/label_gameset.py --list csv/games_glicko.csv --output csv/games_labels.csv --advance 10
 ```
 
 ## Dataset Viewer
@@ -154,7 +156,7 @@ For example, in the following session, we extract the first 100 matchups, and al
 
 ```
 $ VIEWERDIR=datasetviewer
-$ LIST=games_labels.csv
+$ LIST=csv/games_labels.csv
 $ FEATUREDIR=featurecache
 $ $VIEWERDIR/datasetviewer $LIST $FEATUREDIR
 Dataset Viewer: 1890 games read from games_labels.csv (with features), ready.
@@ -187,7 +189,7 @@ The motivation behind assigning rows to sets instead of splitting the entire mat
 Run the set assignment script as follows.
 
 ```
-$ python3 random_split.py --input games_labels.csv --output games_labels.csv --trainingFraction 0.8 --validationFraction 0.1
+$ python3 python/random_split.py --input csv/games_labels.csv --output csv/games_labels.csv --trainingFraction 0.8 --validationFraction 0.1
 ```
 
 This will allocate 80% of all rows to the training set, 10% to the validation set and the remaining 10% to the test set.
@@ -195,7 +197,7 @@ This will allocate 80% of all rows to the training set, 10% to the validation se
 Once allocated, the script can also copy the same set markers to a different CSV file, as long as the "copy-from" file has both "File" and "Set" headers and holds the information on every "File" listed in the input CSV file:
 
 ```
-$ python3 random_split.py --input games_strmodel.csv --copy games_labels.csv
+$ python3 python/random_split.py --input csv/games_strmodel.csv --copy csv/games_labels.csv
 ```
 
 ## The Training Command
@@ -206,7 +208,7 @@ The modified KataGo version from my fork (see above) implements the new `strengt
 $ KATAGO=path/to/katago
 $ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
 $ CONFIG=configs/strength_analysis_example.cfg
-$ LISTFILE=games_labels.csv
+$ LISTFILE=csv/games_labels.csv
 $ FEATUREDIR=path/to/featurecache
 $ katago strength_training -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
 ```
@@ -223,3 +225,7 @@ The modified katago features new tests for the new functionality.
 ```
 $ katago runstrengthmodeltests
 ```
+
+# Plots
+
+Visual presentations of the data found in the thesis are created using scripts in the `plots` subdirectory. Consult [the associated HowTo](plots/HOWTO.md) for reproduction steps.
