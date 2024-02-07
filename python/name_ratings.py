@@ -1,25 +1,30 @@
 # Merge two instances of the same games list, one from `sgffilter.py` and one from goratings `analyze_glicko2_one_game_at_a_time.py`.
 # The merged output list simply restores the paths to the SGFs and the player names from the original.
+# The number and order of rows between the two inputs must match.
+import csv
 
 def main(listpath, ratingspath, outputpath):
-	listfile = open(listpath, "r")
-	ratingsfile = open(ratingspath, "r")
-	outputfile = open(outputpath, "w")
+    listfile = open(listpath, "r")
+    listreader = csv.DictReader(listfile)
+    ratingsfile = open(ratingspath, "r")
+    ratingsreader = csv.DictReader(ratingsfile)
 
-	while True:
-		listline = listfile.readline().rstrip()
-		ratingsline = ratingsfile.readline()
-		if "" == listline:
-			break  # EOF
-		comma = ratingsline.find(',')           # first comma after game id
-		comma = ratingsline.find(',', comma+1)  # second comma after black id
-		comma = ratingsline.find(',', comma+1)  # third comma after white id
-		outputline = listline + ratingsline[comma:]  # join all information
-		outputfile.write(outputline)
+    fieldnames = listreader.fieldnames  # expect: ['File', 'Player White', 'Player Black', 'Score']
+    # take these additional columns from the ratings file
+    ratingsfields = ['PredictedScore','PredictedBlackRating','BlackDeviation','BlackVolatility','PredictedWhiteRating','WhiteDeviation','WhiteVolatility','WhiteRating']
+    fieldnames += ratingsfields
+    outputfile = open(outputpath, "w")
+    writer = csv.DictWriter(outputfile, fieldnames)
+    writer.writeheader()
 
-	outputfile.close()
-	listfile.close()
-	ratingsfile.close()
+    for listrow, ratingsrow in zip(listreader, ratingsreader):
+        for field in ratingsfields:
+            listrow[field] = ratingsrow[field]
+        writer.writerow(listrow)
+
+    outputfile.close()
+    listfile.close()
+    ratingsfile.close()
 
 if __name__ == "__main__":
     import argparse

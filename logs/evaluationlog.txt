@@ -1,0 +1,10 @@
+user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_glicko.csv -m V
+Finished counting run of 184 matchups between 113 players.
+Prediction accuracy: 149/184 (0.810), logp: -0.4160269349270088
+Without zero-info matchups: 134/164 (0.817), logp: -0.4024425452850531
+Only both-rated matchups: 81/91 (0.890), logp: -0.2982905408897432
+user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_glicko.csv -m E
+Finished counting run of 188 matchups between 129 players.
+Prediction accuracy: 145/188 (0.771), logp: -0.48401372686060395
+Without zero-info matchups: 125/159 (0.786), logp: -0.4571601232018844
+Only both-rated matchups: 70/88 (0.795), logp: -0.4406820007991066

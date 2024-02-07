@@ -38,13 +38,37 @@ $ KATAGO=~/source/katago/cpp/katago
 $ CONFIG=~/source/katago/cpp/configs/analysis_example.cfg
 $ MODEL=~/source/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
 $ LIST=csv/games.csv
-$ OUTLIST=csv/games_judged2.csv
-$ python3 ~/source/katago/python/judge_gameset.py -katago-path $KATAGO -config-path $CONFIG -model-path $MODEL -i $LIST -o $OUTLIST
+$ OUTLIST=csv/games_judged.csv
+$ FLAGS=""  # FLAGS=--keep-undecided --max-visits 50
+$ python3 ~/source/katago/python/judge_gameset.py $FLAGS --katago-path $KATAGO --config-path $CONFIG --model-path $MODEL -i $LIST -o $OUTLIST
 ```
 
-## Glicko2 Calculation
+The script copies all columns from the input except for `Winner`. The new winner is noted in the `Score` column of the output file, with a value of `1` if black wins, `0` if white wins, and `0.5` if the game cannot be decided. Undecided games are omitted from the output unless you pass the flag `--keep-undecided` to the script. The depth of evaluation can be modified with the `--max-visits` argument, which passes through to KataGo.
 
-We feed our dataset(s) into our reference rating algorithm Glicko2, which is implemented for OGS in the goratings repository. It contains the script `analyze_glicko2_one_game_at_a_time.py`. The forked repository is extended to read input from our games list and SGF files, and to produce an output list that contains the results of the rating calculation after every game.
+## Splitting the Dataset
+
+The script `random_split.py` reads a CSV file and adds or modifies the "Set" column, which marks each row as a member in one of three sets: "T" for the *training set*, "V" for the *validation set* and "E" for the *test set*. The markers are distributed randomly with prevalence according to user-defined "fraction" parameters.
+
+The motivation behind assigning rows to sets instead of splitting the entire match pool is that if we just form distinct pools from the original one, we tear apart player's rating histories, depriving our algorithms of the data from which they derive their predictions. Instead, we keep them in the same pool. In the training process, we train only on training matches and test only on test matches, while the combined match data is available in the rating history. This technique stems from link prediction problems in social networks, where random test edges are removed from the full graph and later predicted by the model trained on the remaining edges.
+
+Run the set assignment script as follows.
+
+```
+$ python3 python/random_split.py --input csv/games_judged.csv --output csv/games_judged.csv --trainingFraction 0.8 --validationFraction 0.1
+```
+
+This will allocate 80% of all rows to the training set, 10% to the validation set and the remaining 10% to the test set.
+
+Once allocated, the script can also copy the same set markers to a different CSV file, as long as the "copy-from" file has both "File" and "Set" headers and holds the information on every "File" listed in the input CSV file:
+
+```
+$ python3 python/random_split.py --input csv/games_judged.csv --copy csv/games_labels.csv
+```
+
+## Glicko-2 Calculation
+
+We feed our dataset(s) into our reference rating algorithm Glicko-2, which is implemented for OGS in the goratings repository. It contains the script `analyze_glicko2_one_game_at_a_time.py`. The forked repository is extended to read input from our games list and SGF files, and to produce an output list that contains the results of the rating calculation after every game.
+From our list file, the script expects the file name in the first column and the score in the last column. This is the case in `games_judged.csv` from above (before adding the set marker!).
 
 ```
 $ GORATINGS_DIR=path/to/goratings
@@ -58,6 +82,8 @@ Since the scripts in goratings use integer IDs for games and players, we need to
 $ python3 python/name_ratings.py --list csv/games_judged.csv --ratings csv/games_glicko_ids.csv --output csv/games_glicko.csv
 ```
 
+This step is “dataset preparation” in the sense that we may train our model on future Glicko ratings, see Training section below. Otherwise, Glicko-2 is a reference rating system for us.
+
 ## Move Feature Precomputation
 
 Move features are the outputs of the KataGo network and inputs to the strength model. Since the KataGo network is static for us, while the strength model is trained, it saves time to do this expensive precomputation just once. Launch the command to precompute all features for every game in a list file and write them to feature files in a dedicated directory as follows:
@@ -68,58 +94,7 @@ $ FEATUREDIR=path/to/featurecache
 $ katago extract_features -model $KATA_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
 ```
 
-TODO: actually implement this
-
-## Strength Model Calculation
-
-Once the strength model is trained, we can apply it to a dataset by invoking the modified KataGo (needs to be compiled from my fork, see above) with the `rating_system` command.
-
-```
-$ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
-$ CONFIG=configs/analysis_example.cfg
-$ LISTFILE=csv/games_judged.csv
-$ OUTFILE=csv/games_strmodel.csv
-$ FEATUREDIR=path/to/featurecache
-$ katago rating_system -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -outlist $OUTFILE -featuredir $FEATUREDIR -set V
-```
-
-The `-featuredir` is mandatory and must hold the precomputed extracted move features for every game. These must be prepared by `extract_features` as outlined above.
-
-The output file contains the results of the rating calculation, directly comparable to the output of the Glicko2 analysis script above.
-
-## Rating the Rating System
-
-The quality of a rating system is measured by its ability to predict the winners of matchups as they happen. When the higher-rated player beats the lower-rated player, the system was successful. Moreover, we value not just the number of successfully predicted matchups, but also the degree of the prediction. The higher the prior rating of the eventual winner compared to the the loser, the more performant our system.
-We measure the success rate as the number of successful predictions divided by the total number of matches. We measure the performance as the sum of log-likelihoods of every outcome prediction (logp). This is the total log-likelihood of all the outcomes happening as they did according to the strength model based on the prior information at the time.
-
-Given a rating calculation file like `games_glicko.csv` or `games_strmodel.csv` in the examples above, that contains the Winner and WhiteWinrate of every game, the script `calc_performance.py` tells us the success rate and log-likelihood achieved by the system. It also counts with and without games involving new players, who come into the system with no prior information.
-
-```
-$ python3 python/calc_performance.py csv/games_strmodel.csv
-```
-
-## Labeling Games
-
-One way to train our strength model is to let it predict the players' future rating number. The `label_gameset.py` script provided in this repository reads the list of games that we produced in the previous steps. The output games list contains the future rating of both the black and the white player involved, from the point when they have played an additional number of games as specified in the `--advance` argument.
-
-For example, if Alice starts with a rating of 1000 and then plays against B, C, D, E and F, resulting in ratings of 1100, 1200, 1300, 1400 and 1500 respectively, and the `--advance` option is set to 3 (games in the future), then the resultant labeling might be:
-
-```
-File,Player White,Player Black,Winner,Label White,Label Black
-Alice_vs_B.sgf,Alice,B,W+,1300,1000
-Alice_vs_C.sgf,Alice,C,W+,1400,1000
-Alice_vs_D.sgf,Alice,D,W+,1500,1000
-Alice_vs_E.sgf,Alice,E,W+,1500,1000
-Alice_vs_F.sgf,Alice,F,W+,1500,1000
-```
-
-Run the script as follows.
-
-```
-$ python3 python/label_gameset.py --list csv/games_glicko.csv --output csv/games_labels.csv --advance 10
-```
-
-## Dataset Viewer
+# Dataset Viewer
 
 `datasetviewer` is a utility program that allows us to query data from the dataset. It must be compiled from its C++ sources, located in this repository in the `datasetviewer` subdirectory.
 
@@ -180,24 +155,25 @@ $
 Using the dataset as prepared above, we can train the strength model on it – either from scratch, or by loading an existing model file.
 The strength model is implemented as a modification to KataGo, the C++ program. Note that KataGo, apart from its main program, also consists of Python scripts which are used to train the KataGo model itself. We disregard these training programs, as our training is implemented entirely in C++.
 
-## Splitting the Dataset
+## Labeling Games
 
-The script `random_split.py` reads a CSV file and adds or modifies the "Set" column, which marks each row as a member in one of three sets: "T" for the *training set*, "V" for the *validation set* and "E" for the *test set*. The markers are distributed randomly with prevalence according to user-defined "fraction" parameters.
+One way to train our strength model is to let it predict the players' future rating number. The `label_gameset.py` script provided in this repository reads the list of games that we produced in the previous steps. The output games list contains the future rating of both the black and the white player involved, from the point when they have played an additional number of games as specified in the `--advance` argument.
 
-The motivation behind assigning rows to sets instead of splitting the entire match pool is that if we just form distinct pools from the original one, we tear apart player's rating histories, depriving our algorithms of the data from which they derive their predictions. Instead, we keep them in the same pool. In the training process, we train only on training matches and test only on test matches, while the combined match data is available in the rating history. This technique stems from link prediction problems in social networks, where random test edges are removed from the full graph and later predicted by the model trained on the remaining edges.
-
-Run the set assignment script as follows.
+For example, if Alice starts with a rating of 1000 and then plays against B, C, D, E and F, resulting in ratings of 1100, 1200, 1300, 1400 and 1500 respectively, and the `--advance` option is set to 3 (games in the future), then the resultant labeling might be:
 
 ```
-$ python3 python/random_split.py --input csv/games_labels.csv --output csv/games_labels.csv --trainingFraction 0.8 --validationFraction 0.1
+File,Player White,Player Black,Winner,Label White,Label Black
+Alice_vs_B.sgf,Alice,B,W+,1300,1000
+Alice_vs_C.sgf,Alice,C,W+,1400,1000
+Alice_vs_D.sgf,Alice,D,W+,1500,1000
+Alice_vs_E.sgf,Alice,E,W+,1500,1000
+Alice_vs_F.sgf,Alice,F,W+,1500,1000
 ```
 
-This will allocate 80% of all rows to the training set, 10% to the validation set and the remaining 10% to the test set.
-
-Once allocated, the script can also copy the same set markers to a different CSV file, as long as the "copy-from" file has both "File" and "Set" headers and holds the information on every "File" listed in the input CSV file:
+Run the script as follows.
 
 ```
-$ python3 python/random_split.py --input csv/games_strmodel.csv --copy csv/games_labels.csv
+$ python3 python/label_gameset.py --list csv/games_glicko.csv --output csv/games_labels.csv --advance 10
 ```
 
 ## The Training Command
@@ -217,6 +193,60 @@ Please keep in mind that relative SGF paths in `LISTFILE` must be relative to th
 If the `LISTFILE` contains the "Set" column from the previous step, the matches will be used according to their designation. The program trains the model on training matches, reporting progress on the training and validation sets after every epoch.
 
 Currently, the model is a simple proof of concept. After training completes, the result is saved in the file given as `STRENGTH_MODEL`.
+
+# Evaluation
+
+Given a CSV rating calculation file with the required columns, our script `calc_performance.py` calculates the relevant metrics of the rating system which produced the input file.
+The required columns are:
+
+* `Score` and `PredictedScore`
+* `Player Black` and `Player White`, to distinguish between first-timers and players with information attached
+* `Set` (optional), to calculate only on set `T`, `V` or `E` (e.g. `V` for validation set)
+
+These columns are present in the files produced in the relevant sections: `games_glicko.csv` from “Glicko-2 Calculation” above, and the outputs of the following steps.
+
+## Stochastic Model Calculation
+
+The Stochastic Model is a simple idea that we can predict winning chances based on the expected points loss of both players in their match.
+It is implemented in the modified KataGo (needs to be compiled from my fork, see above) with the `rating_system` command.
+
+```
+$ CONFIG=configs/analysis_example.cfg
+$ LISTFILE=csv/games_judged.csv
+$ OUTFILE=csv/games_stochastic.csv
+$ FEATUREDIR=path/to/featurecache
+$ katago rating_system -config $CONFIG -list $LISTFILE -outlist $OUTFILE -featuredir $FEATUREDIR -set V
+```
+
+The `-featuredir` is mandatory and must hold the precomputed extracted move features for every game. These must be prepared by `extract_features` as outlined above.
+
+The output file contains the results of the rating calculation, directly comparable to the output of the Glicko-2 analysis script above.
+
+## Strength Model Calculation
+
+Once the strength model is trained, we can apply it to a dataset by invoking modified KataGo as above, with the `-strengthmodel` parameter:
+
+```
+$ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
+$ CONFIG=configs/analysis_example.cfg
+$ LISTFILE=csv/games_judged.csv
+$ OUTFILE=csv/games_strmodel.csv
+$ FEATUREDIR=path/to/featurecache
+$ katago rating_system -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -outlist $OUTFILE -featuredir $FEATUREDIR -set V
+```
+
+The `-featuredir` is again mandatory and the output file is a valid rating calculation file.
+
+## Rating the Rating Systems
+
+The quality of a rating system is measured by its ability to predict the winners of matchups as they happen. When the higher-rated player beats the lower-rated player, the system was successful. Moreover, we value not just the number of successfully predicted matchups, but also the degree of the prediction. The higher the prior rating of the eventual winner compared to the the loser, the more performant our system.
+We measure the success rate as the number of successful predictions divided by the total number of matches. We measure the performance as the average of log-likelihoods of every outcome prediction (logp). This is the log-likelihood of all the outcomes happening as they did according to the rating system based on the prior information at the time, scaled with dataset size for better comparison.
+
+Given a rating calculation file as defined above, the script `calc_performance.py` tells us the success rate and log-likelihood achieved by the system. It also counts with and without games involving new players, who come into the system with no prior information.
+
+```
+$ python3 python/calc_performance.py csv/games_strmodel.csv -m V
+```
 
 # Tests
 

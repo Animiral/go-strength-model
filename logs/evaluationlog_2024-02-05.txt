@@ -1,0 +1,87 @@
+user@Linux-Mint:~/thesis/win/go-strength-model$ ./calc_performance.py csv/glicko-evaluation.csv -m V
+Finished counting run of 189 matchups between 113 players.
+Prediction accuracy: 55/189 (0.291), logp: -305.5986374163805
+Without zero-info matchups: 47/169 (0.278), logp: -272.26154814148
+Only both-rated matchups: 20/96 (0.208), logp: -168.96327725464147
+(averaged logps: -1.6169240074940767, -1.6110150777602366, -1.760034138069182)
+
+user@Linux-Mint:~/thesis/win/go-strength-model$ ./calc_performance.py csv/glicko-evaluation.csv -m E
+Finished counting run of 189 matchups between 129 players.
+Prediction accuracy: 54/189 (0.286), logp: -1.3781669939950316
+Without zero-info matchups: 43/160 (0.269), logp: -1.4234280729513817
+Only both-rated matchups: 20/89 (0.225), logp: -1.520793425771449
+
+user@Linux-Mint:~/thesis/win/go-strength-model$ ./calc_performance.py csv/stochastic-evaluation.csv -m V
+Warning! Undecided game in dataset: dataset/2006/01/31/13230-Reepicheep-malweth.sgf
+Warning! Undecided game in dataset: dataset/2006/09/29/17582-wesh-jms.sgf
+Warning! Undecided game in dataset: dataset/2006/11/18/19803-zerodan-zaru_soba.sgf
+Warning! Undecided game in dataset: dataset/2006/11/18/19816-zaru_soba-ekabiljo.sgf
+Warning! Undecided game in dataset: dataset/2006/12/04/21047-holywarrior-rehab_doll.sgf
+Finished counting run of 189 matchups between 113 players.
+Prediction accuracy: 143/189 (0.757), logp: -116.40009434997764
+Without zero-info matchups: 128/169 (0.757), logp: -104.83593075446184
+Only both-rated matchups: 72/96 (0.750), logp: -47.78438638789671
+(averaged logps: -0.6158735150792467, -0.6203309512098334, -0.49775402487392406)
+
+user@Linux-Mint:~/thesis/win/go-strength-model$ ./calc_performance.py csv/stochastic-evaluation.csv -m E
+Warning! Undecided game in dataset: dataset/2006/11/26/20109-maproom-Z.sgf
+Finished counting run of 189 matchups between 129 players.
+Prediction accuracy: 140/189 (0.741), logp: -inf
+Without zero-info matchups: 123/160 (0.769), logp: -0.5564764229601039
+Only both-rated matchups: 70/89 (0.787), logp: -0.5130092224050854
+
+user@Linux-Mint:~/thesis/win/go-strength-model$ ./calc_performance.py csv/poc-evaluation.csv -m T
+Warning! Undecided game in dataset: dataset/2005/12/29/13075-Reepicheep-saiclone.sgf
+Warning! Undecided game in dataset: dataset/2005/12/29/13076-saiclone-udhar_nabresh.sgf
+Warning! Undecided game in dataset: dataset/2006/03/08/13452-bachkiesel-ISebastian.sgf
+Warning! Undecided game in dataset: dataset/2006/04/02/13758-rosa-bachkiesel.sgf
+Warning! Undecided game in dataset: dataset/2006/04/04/13800-saruman-topazg.sgf
+Warning! Undecided game in dataset: dataset/2006/04/25/14098-rcc-dobromila.sgf
+Warning! Undecided game in dataset: dataset/2006/05/04/14294-dobromila-rosa.sgf
+Warning! Undecided game in dataset: dataset/2006/05/31/14739-GOCarata-nevermore.sgf
+Warning! Undecided game in dataset: dataset/2006/06/07/15031-Funfun-zerodan.sgf
+Warning! Undecided game in dataset: dataset/2006/07/20/15737-nest-topazg.sgf
+Warning! Undecided game in dataset: dataset/2006/08/01/16008-nest-ekabiljo.sgf
+Warning! Undecided game in dataset: dataset/2006/08/01/16011-jms-nest.sgf
+Warning! Undecided game in dataset: dataset/2006/08/01/16012-nest-jms.sgf
+Warning! Undecided game in dataset: dataset/2006/08/01/16014-nest-dorota.sgf
+Warning! Undecided game in dataset: dataset/2006/08/01/16076-Method-Arathalion.sgf
+Warning! Undecided game in dataset: dataset/2006/09/30/17601-devon-Sensei.sgf
+Warning! Undecided game in dataset: dataset/2006/10/02/17882-fingolfin-devon.sgf
+Warning! Undecided game in dataset: dataset/2006/10/12/18325-Brushfire-teowitgo.sgf
+Warning! Undecided game in dataset: dataset/2006/10/14/18371-ekabiljo-CurAvon.sgf
+Warning! Undecided game in dataset: dataset/2006/10/29/18935-Z-visipoli.sgf
+Warning! Undecided game in dataset: dataset/2006/10/30/18971-X-betterlife.sgf
+Warning! Undecided game in dataset: dataset/2006/11/18/19789-wesh-zaru_soba.sgf
+Warning! Undecided game in dataset: dataset/2006/11/18/19799-zerodan-GOCarata.sgf
+Warning! Undecided game in dataset: dataset/2006/11/18/19804-zaru_soba-zerodan.sgf
+Warning! Undecided game in dataset: dataset/2006/11/18/19824-kuikka-rcc.sgf
+Warning! Undecided game in dataset: dataset/2006/11/18/19831-GOCarata-kuikka.sgf
+Warning! Undecided game in dataset: dataset/2006/11/18/19840-zaru_soba-kuikka.sgf
+Warning! Undecided game in dataset: dataset/2006/12/01/20443-austin-ISebastian.sgf
+Warning! Undecided game in dataset: dataset/2006/12/01/20519-ekabiljo-fingolfin.sgf
+Warning! Undecided game in dataset: dataset/2006/12/03/21017-V-Lewanuva2003.sgf
+Finished counting run of 1512 matchups between 276 players.
+Prediction accuracy: 478/1512 (0.316), logp: -1654.7698593716539
+Without zero-info matchups: 468/1486 (0.315), logp: -1633.9957330568716
+Only both-rated matchups: 331/1262 (0.262), logp: -1429.4873233051364
+(averaged logps: -1.0944245101664378, -1.0995933600651895, -1.1327157870880638)
+
+user@Linux-Mint:~/thesis/win/go-strength-model$ ./calc_performance.py csv/poc-evaluation.csv -m V
+Warning! Undecided game in dataset: dataset/2006/01/31/13230-Reepicheep-malweth.sgf
+Warning! Undecided game in dataset: dataset/2006/09/29/17582-wesh-jms.sgf
+Warning! Undecided game in dataset: dataset/2006/11/18/19803-zerodan-zaru_soba.sgf
+Warning! Undecided game in dataset: dataset/2006/11/18/19816-zaru_soba-ekabiljo.sgf
+Warning! Undecided game in dataset: dataset/2006/12/04/21047-holywarrior-rehab_doll.sgf
+Finished counting run of 189 matchups between 113 players.
+Prediction accuracy: 52/189 (0.275), logp: -214.84521876151567
+Without zero-info matchups: 42/169 (0.249), logp: -192.38985741196336
+Only both-rated matchups: 18/96 (0.188), logp: -104.4911715622813
+(averaged logps: -1.1367471892143686, -1.1384015231477123, -1.0884497037737635)
+
+user@Linux-Mint:~/thesis/win/go-strength-model$ ./calc_performance.py csv/poc-evaluation.csv -m E
+Warning! Undecided game in dataset: dataset/2006/11/26/20109-maproom-Z.sgf
+Finished counting run of 189 matchups between 129 players.
+Prediction accuracy: 67/189 (0.354), logp: -1.0878474655163377
+Without zero-info matchups: 54/160 (0.338), logp: -1.1051229982516297
+Only both-rated matchups: 22/89 (0.247), logp: -1.0822527071186696

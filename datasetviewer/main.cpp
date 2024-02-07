@@ -32,14 +32,14 @@ void print_command(istringstream& args);
 void dump_command(istringstream& args);
 
 enum class Topic { games, moves };
-enum class GameColumn { gamenum, file, black_name, white_name, black_rating, white_rating, score, predscore, set };
+enum class GameColumn { gamenum, file, black_name, white_name, black_rating, white_rating, black_rank, white_rank, score, predscore, set };
 enum class MoveColumn { movenum, color, winprob, lead, policy, maxpolicy, wrloss, ploss, rating };
 enum class GameFilter { none, gamenum, file, black, white, score, predscore, set };
 enum class MoveFilter { none, recent, color };
 template<class E> struct EnumStr {};
 #define ENUM_STR(E,N,S) template<> struct EnumStr<E> { using type = E; static string name() { return N; } static string str() { return S; } };
 ENUM_STR(Topic,"TOPIC","games|moves")
-ENUM_STR(GameColumn,"COLUMN","#|file|black.name|white.name|black.rating|white.rating|score|predscore|set")
+ENUM_STR(GameColumn,"COLUMN","#|file|black.name|white.name|black.rating|white.rating|black_rank|white_rank|score|predscore|set")
 ENUM_STR(MoveColumn,"COLUMN","#|color|winprob|lead|policy|maxpolicy|wrloss|ploss|rating")
 ENUM_STR(GameFilter,"FILTER","none|#|file|black|white|score|predscore|set")
 ENUM_STR(MoveFilter,"FILTER","none|recent|color")
@@ -54,6 +54,7 @@ struct Move {
 template<class E> bool parse_enum(const string& input, E& topic);
 bool is_numeric_filter(GameFilter filter);
 bool is_numeric_filter(MoveFilter filter);
+void print_rank(std::ostream& stream, float rating);
 string column_string(size_t gamenum, const vector<GameColumn>& entries, char delim);
 string column_string(const Move& move, const vector<MoveColumn>& entries, char delim);
 vector<bool> selected_games();
@@ -168,7 +169,7 @@ void info_command_predicate(auto& selection) {
     else {
       strprintf(cout, " contains %s\n", selection.pattern.c_str());
     }
-  };
+  }
 }
 
 void info_command() {
@@ -401,6 +402,19 @@ bool is_numeric_filter(MoveFilter filter) {
   return MoveFilter::recent == filter;
 }
 
+void print_rank(std::ostream& stream, float rating) {
+  float ranknr = std::logf(rating / 525) * 23.15;  // from https://forums.online-go.com/t/2021-rating-and-rank-adjustments/33389
+  // 0==25.0k, 25==1.0d
+  if(ranknr < 25) {
+    float kyu = min(25 - ranknr, 30.f);
+    strprintf(stream, "%.1fk", kyu);
+  }
+  else {
+    float dan = min(ranknr - 24, 9.f);
+    strprintf(stream, "%.1fd", dan);
+  }
+}
+
 string column_string(size_t gamenum, const vector<GameColumn>& entries, char delim) {
   const Dataset::Game& game = dataset.games[gamenum];
   std::ostringstream oss;
@@ -417,6 +431,8 @@ string column_string(size_t gamenum, const vector<GameColumn>& entries, char del
     case GameColumn::white_name: oss << dataset.players[game.white.player].name.c_str(); break;
     case GameColumn::black_rating: oss << game.black.rating; break;
     case GameColumn::white_rating: oss << game.white.rating; break;
+    case GameColumn::black_rank: print_rank(oss, game.black.rating); break;
+    case GameColumn::white_rank: print_rank(oss, game.white.rating); break;
     case GameColumn::score: oss << game.score; break;
     case GameColumn::predscore: oss << game.prediction.score; break;
     case GameColumn::set: oss << "TVBE"[game.set]; break;
