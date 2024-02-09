@@ -92,6 +92,7 @@ def main(listpath, setmarker='V'):
 
             players.add(player_white)
             players.add(player_black)
+            # print(f"{player_black} vs {player_white}: s={score}, p={predScore}, log(p)={row_logp}")
 
     count_withinfo = count - zeroinfo
     count_fullinfo = count - zeroinfo - oneinfo

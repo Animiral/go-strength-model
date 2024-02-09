@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstdarg>
 #include <cstdlib>
+#include <cmath>
 #include <cerrno>
 #include <cstring>
 
@@ -39,7 +40,7 @@ enum class MoveFilter { none, recent, color };
 template<class E> struct EnumStr {};
 #define ENUM_STR(E,N,S) template<> struct EnumStr<E> { using type = E; static string name() { return N; } static string str() { return S; } };
 ENUM_STR(Topic,"TOPIC","games|moves")
-ENUM_STR(GameColumn,"COLUMN","#|file|black.name|white.name|black.rating|white.rating|black_rank|white_rank|score|predscore|set")
+ENUM_STR(GameColumn,"COLUMN","#|file|black.name|white.name|black.rating|white.rating|black.rank|white.rank|score|predscore|set")
 ENUM_STR(MoveColumn,"COLUMN","#|color|winprob|lead|policy|maxpolicy|wrloss|ploss|rating")
 ENUM_STR(GameFilter,"FILTER","none|#|file|black|white|score|predscore|set")
 ENUM_STR(MoveFilter,"FILTER","none|recent|color")
@@ -403,14 +404,14 @@ bool is_numeric_filter(MoveFilter filter) {
 }
 
 void print_rank(std::ostream& stream, float rating) {
-  float ranknr = std::logf(rating / 525) * 23.15;  // from https://forums.online-go.com/t/2021-rating-and-rank-adjustments/33389
+  float ranknr = std::log(rating / 525) * 23.15;  // from https://forums.online-go.com/t/2021-rating-and-rank-adjustments/33389
   // 0==25.0k, 25==1.0d
   if(ranknr < 25) {
-    float kyu = min(25 - ranknr, 30.f);
+    float kyu = std::min(25 - ranknr, 30.f);
     strprintf(stream, "%.1fk", kyu);
   }
   else {
-    float dan = min(ranknr - 24, 9.f);
+    float dan = std::min(ranknr - 24, 9.f);
     strprintf(stream, "%.1fd", dan);
   }
 }

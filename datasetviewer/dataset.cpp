@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <cstdlib>
 #include <cstdio>
 #include <memory>
 
@@ -29,7 +30,7 @@ void Dataset::load(const string& path, const string& featureDir) {
   nameIndex.clear();
 
   // map known fieldnames to row indexes, wherever they may be
-  enum class F { ignore, sgfPath, whiteName, blackName, whiteLabel, blackLabel, winner, set };
+  enum class F { ignore, sgfPath, whiteName, blackName, whiteRating, blackRating, score, predictedScore, set };
   vector<F> fields;
   string field;
   std::istringstream iss(line);
@@ -37,9 +38,10 @@ void Dataset::load(const string& path, const string& featureDir) {
     if("File" == field) fields.push_back(F::sgfPath);
     else if("Player White" == field) fields.push_back(F::whiteName);
     else if("Player Black" == field) fields.push_back(F::blackName);
-    else if("WhiteLabel" == field) fields.push_back(F::whiteLabel);
-    else if("BlackLabel" == field) fields.push_back(F::blackLabel);
-    else if("Winner" == field || "Judgement" == field) fields.push_back(F::winner);
+    else if("WhiteRating" == field) fields.push_back(F::whiteRating);
+    else if("BlackRating" == field) fields.push_back(F::blackRating);
+    else if("Winner" == field || "Judgement" == field || "Score" == field) fields.push_back(F::score);
+    else if("PredictedScore" == field) fields.push_back(F::predictedScore);
     else if("Set" == field) fields.push_back(F::set);
     else fields.push_back(F::ignore);
   }
@@ -63,17 +65,22 @@ void Dataset::load(const string& path, const string& featureDir) {
       case F::blackName:
         game.black.player = getOrInsertNameIndex(field);
         break;
-      case F::whiteLabel:
+      case F::whiteRating:
         game.white.rating = Global::stringToFloat(field);
         break;
-      case F::blackLabel:
+      case F::blackRating:
         game.black.rating = Global::stringToFloat(field);
         break;
-      case F::winner:
+      case F::score:
         if('b' == field[0] || 'B' == field[0])
           game.score = 1;
         else if('w' == field[0] || 'W' == field[0])
           game.score = 0;
+        else
+          game.score = std::strtof(field.c_str(), nullptr);
+        break;
+      case F::predictedScore:
+        game.prediction.score = std::strtof(field.c_str(), nullptr);
         break;
       case F::set:
         if("t" == field || "T" == field) game.set = Game::training;
@@ -100,6 +107,16 @@ void Dataset::load(const string& path, const string& featureDir) {
     loadFeatures(featureDir);
 }
 
+namespace {
+  const char* scoreToString(float score) {
+    // only 3 values are really allowed, all perfectly representable in float
+    if(0 == score)     return "0";
+    if(1 == score)     return "1";
+    if(0.5 == score)   return "0.5";
+    else               return "(score error)";
+  }
+}
+
 void Dataset::store(const string& path) const {
   std::ofstream ostrm(path);
   if (!ostrm.is_open())
@@ -114,9 +131,9 @@ void Dataset::store(const string& path) const {
     // file output
     size_t bufsize = game.sgfPath.size() + whiteName.size() + blackName.size() + 100;
     std::unique_ptr<char[]> buffer( new char[ bufsize ] );
-    int printed = std::snprintf(buffer.get(), bufsize, "%s,%s,%s,%f,%.2f,%.2f,%f,%f,%f,%c\n",
+    int printed = std::snprintf(buffer.get(), bufsize, "%s,%s,%s,%s,%.2f,%.2f,%.9f,%f,%f,%c\n",
       game.sgfPath.c_str(), whiteName.c_str(), blackName.c_str(),
-      game.score, game.black.rating, game.white.rating,
+      scoreToString(game.score), game.black.rating, game.white.rating,
       game.prediction.score, game.prediction.blackRating, game.prediction.whiteRating, "TVBE"[game.set]);
     if(printed <= 0)
       throw IOError("Error during formatting.");
@@ -250,8 +267,14 @@ float fVar(float a[], size_t N, float avg) noexcept { // corrected variance
   return fSum(a, N) / (N-1);
 }
 
+// Because of float limitations, normcdf(x) maxes out for |x| > 5.347.
+// Therefore its value is capped such that the result P as well as
+// 1.f-P are in the closed interval (0, 1) under float arithmetic.
 float normcdf(float x) noexcept {
-  return .5f * (1.f + std::erf(x / std::sqrt(2.f)));
+  float P = .5f * (1.f + std::erf(x / std::sqrt(2.f)));
+  if(P >= 1) return std::nextafter(1.f, 0.f);     // =0.99999994f, log(0.99999994f): -5.96e-08
+  if(P <= 0) return 1 - std::nextafter(1.f, 0.f); // =0.00000006f, log(0.00000006f): -16.63
+  else return P;
 }
 
 }

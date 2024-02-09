@@ -30,10 +30,13 @@ def get_label(player, game, advance):
 	return p.rating[p.history[i]]
 
 def main(listpath, outputpath, advance):
-	# Input CSV format (title row):
-	# File,Player White,Player Black,Winner,Judgement,WhiteWinrate,BlackRating,BlackDeviation,BlackVolatility,WhiteRating,WhiteDeviation,WhiteVolatility
+	# Required input CSV columns (title row):
+	#   File,Player White,Player Black,BlackRating,WhiteRating
+	# Optional rows copied:
+	#   Winner,Judgement,Score,Set
 	with open(listpath, "r") as listfile:
 		reader = csv.DictReader(listfile)
+		inputfields = reader.fieldnames
 		rows = list(reader)
 
     # first pass: extract rating info
@@ -50,13 +53,16 @@ def main(listpath, outputpath, advance):
 	for row in rows:
 		game = row["File"]
 		white = row["Player White"]
-		row["WhiteLabel"] = get_label(white, game, advance)
+		row["WhiteRating"] = get_label(white, game, advance)
 		black = row["Player Black"]
-		row["BlackLabel"] = get_label(black, game, advance)
+		row["BlackRating"] = get_label(black, game, advance)
 
 	# write output CSV file
 	with open(outputpath, 'w') as outfile:
-		fieldnames = ["File", "Player White", "Player Black", "WhiteLabel", "BlackLabel"]
+		fieldnames = ["File", "Player White", "Player Black", "WhiteRating", "BlackRating"]
+		for optionalfield in ["Winner", "Judgement", "Score", "Set"]:
+			if optionalfield in inputfields:
+				fieldnames.append(optionalfield)
 		writer = csv.DictWriter(outfile, fieldnames=fieldnames)
 		writer.writeheader()
 		for row in rows:

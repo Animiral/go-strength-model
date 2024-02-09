@@ -8,3 +8,14 @@ Finished counting run of 188 matchups between 129 players.
 Prediction accuracy: 145/188 (0.771), logp: -0.48401372686060395
 Without zero-info matchups: 125/159 (0.786), logp: -0.4571601232018844
 Only both-rated matchups: 70/88 (0.795), logp: -0.4406820007991066
+
+user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_stochastic.csv -m V
+Finished counting run of 184 matchups between 113 players.
+Prediction accuracy: 140/184 (0.761), logp: -0.6300356125237737
+Without zero-info matchups: 125/164 (0.762), logp: -0.6363558084603422
+Only both-rated matchups: 69/91 (0.758), logp: -0.5150010254228186
+user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_stochastic.csv -m E
+Finished counting run of 188 matchups between 129 players.
+Prediction accuracy: 140/188 (0.745), logp: -0.7668074661372509
+Without zero-info matchups: 123/159 (0.774), logp: -0.5682926075606708
+Only both-rated matchups: 70/88 (0.795), logp: -0.5144038836654211
