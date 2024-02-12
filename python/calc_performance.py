@@ -4,6 +4,11 @@
 import csv
 import math
 
+# Glicko-2 expected score from OGS/goratings repository; without RD/volatility
+def glickoScore(black_rating, white_rating) -> float:
+    GLICKO2_SCALE = 173.7178
+    return 1 / (1 + math.exp((white_rating - black_rating) / GLICKO2_SCALE))
+
 def getScore(row):
     if "Score" in row.keys():
         return float(row["Score"])
@@ -22,10 +27,24 @@ def getScore(row):
         return 0.5  # Jigo and undecided cases
 
 def getPredScore(row):
-    if "PredictedScore" in row.keys():
+    cols = row.keys()  # available columns
+    if "PredictedScore" in cols:
         ps = float(row["PredictedScore"])
+    elif "WhiteWinrate" in cols:
+        ps = 1 - float(row["WhiteWinrate"])
+    elif ("BlackRating" in cols or "PredictedBlackRating" in cols) and ("WhiteRating" in cols or "PredictedWhiteRating" in cols):
+        # use glicko score from ratings
+        if "BlackRating" in cols:
+            black_rating = float(row["BlackRating"])
+        else:
+            black_rating = float(row["PredictedBlackRating"])
+        if "WhiteRating" in cols:
+            white_rating = float(row["WhiteRating"])
+        else:
+            white_rating = float(row["PredictedWhiteRating"])
+        ps = glickoScore(black_rating, white_rating)
     else:
-        ps = 1 - float(row['WhiteWinrate'])
+        raise ValueError("Missing column for score prediction! (PredictedScore or WhiteWinrate or BlackRating+WhiteRating or PredictedBlackRating+PredictedWhiteRating)")
 
     if math.isnan(ps):
         ps = 0.5
@@ -44,7 +63,9 @@ def tolerant_log(x): # accepts x=0 and outputs -inf instead of ValueError
     else:
         return math.log(x)
 
-def main(listpath, setmarker='V'):
+# Calculate rating performance on the list file, filter by the given set marker.
+# If fixed_prediction is True, the result will be the same as predicting 50:50 every game.
+def main(listpath, setmarker='V', fixed_prediction=False):
     count = 0         # total records
     success = 0       # correctly predicted game result
     zeroinfo = 0      # number of records with first occurrence of both players
@@ -67,7 +88,7 @@ def main(listpath, setmarker='V'):
             player_white = row['Player White']
             player_black = row['Player Black']
             score = getScore(row)
-            predScore = getPredScore(row)
+            predScore = 0.5 if fixed_prediction else getPredScore(row)
             if score > 0.5: # black win
                 row_success = predScore > 0.5
             else: # white win
@@ -110,10 +131,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Calculate the prediction success rate and log-likelihood of a rating system run record CSV.")
     parser.add_argument("list", type=str, help='Path to the CSV file listing the games, results and winrate.')
     parser.add_argument("-m", "--setmarker", type=str, default="*", help='Calculate on "T": training set, "V": validation set, "E": test set, "*": all')
+    parser.add_argument("--fixed-prediction", type=bool, default=False, help='Ignore predictions, instead predict 50:50 chances on every single game')
     args = parser.parse_args()
 
     if args.setmarker not in ['T', 'V', 'E', '*']:
         raise ValueError("Set marker must be one of 'T', 'V', 'E', '*'.")
 
-    main(args.list, args.setmarker)
+    main(args.list, args.setmarker, args.fixed_prediction)
 

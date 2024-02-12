@@ -27,3 +27,12 @@ Done.
 Dataset Viewer: bye!
 $ python3 plots/ploss_rating.py csv/data-ploss.csv
 ```
+
+# Glicko-2 Confidence
+
+This plot shows how the rating deviation develops over time in our reference Glicko-2 evaluation.
+It sources its data from the result as described in the main README, Section “Glicko-2 Calculation”.
+
+```
+$ python3 plots/deviation.py csv/games_glicko.csv
+```

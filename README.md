@@ -9,7 +9,7 @@ Python scripts are located in the `python` subdirectory. By convention, we dump 
 The following external dependencies are required:
 
 * my [fork of the katago repository](https://github.com/Animiral/KataGo), originally [here](https://github.com/lightvector/KataGo)
-* any (KataGo network)[https://katagotraining.org/networks/]
+* any [KataGo network](https://katagotraining.org/networks/)
 * a CUDA compatible graphics card, because the modified KataGo is currently restricted to the CUDA backend
 * to use the strength model: a fully trained strength model file
 * to train the strength model from scratch:
@@ -141,7 +141,7 @@ Commands:
   print TOPIC COLUMN...                 Write the values to stdout.
   dump FILE TOPIC COLUMN...             Write the values to FILE.
     TOPIC choices: games|moves
-    COLUMN choices for games: #|file|black.name|white.name|black.rating|white.rating|score|predscore|set
+    COLUMN choices for games: #|file|black.name|white.name|black.rating|white.rating|black.rank|white.rank|score|predscore|set
     COLUMN choices for moves: #|color|winprob|lead|policy|maxpolicy|wrloss|ploss|rating
 ```
 
