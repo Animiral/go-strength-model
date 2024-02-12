@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 
 config = {
-  'low_rating': 1200,
-  'high_rating': 1800,
+  'low_rating': 1245,  # 10-kyu
+  'high_rating': 1920, # 1-dan
   'gains_level': -2,
   'blunders_level': 15
 }

@@ -8,12 +8,30 @@ Python scripts are located in the `python` subdirectory. By convention, we dump 
 
 The following external dependencies are required:
 
-* the [sgfmill](https://github.com/mattheww/sgfmill) Python package: `pip3 install sgfmill`
 * my [fork of the katago repository](https://github.com/Animiral/KataGo), originally [here](https://github.com/lightvector/KataGo)
 * any (KataGo network)[https://katagotraining.org/networks/]
-* my [fork of the goratings repository](https://github.com/Animiral/goratings), originally [here](https://github.com/online-go/goratings)
-* a dataset to work on, like the [OGS 2021 collection](https://archive.org/details/ogs2021)
 * a CUDA compatible graphics card, because the modified KataGo is currently restricted to the CUDA backend
+* to use the strength model: a fully trained strength model file
+* to train the strength model from scratch:
+  - the [sgfmill](https://github.com/mattheww/sgfmill) Python package: `pip3 install sgfmill`
+  - my [fork of the goratings repository](https://github.com/Animiral/goratings), originally [here](https://github.com/online-go/goratings)
+  - a dataset to work on, like the [OGS 2021 collection](https://archive.org/details/ogs2021)
+
+# Estimate Playing Strength
+
+Using the modified KataGo and a strength model file, we can let the program estimate a player's Glicko rating.
+The strength model file can be obtained, for example, by following the further steps in this README to train it on an existing game dataset.
+In addition to that model file, we only need to pass it a set of SGF files and a player name.
+
+```
+$ KATAGO=path/to/katago/cpp/katago
+$ CONFIG=path/to/katago/cpp/configs/analysis_example.cfg
+$ MODEL=path/to/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
+$ STRENGTH_MODEL=$KATADIR/models/strength-model.bin
+$ PLAYER=playername
+$ SGF=sgf/game1.sgf sgf/game2.sgf sgf/game3.sgf
+$ $KATAGO strength_analysis -config $CONFIG -model $MODEL -strengthmodel $STRENGTH_MODEL -player $PLAYER $SGF
+```
 
 # Dataset Preparation
 
@@ -34,9 +52,9 @@ In this optional step, we override the specified winner of each game in the list
 The forked KataGo repository contains the script `judge_gameset.py`, which can read our prepared `games.csv` and output a new list with predicted winners.
 
 ```
-$ KATAGO=~/source/katago/cpp/katago
-$ CONFIG=~/source/katago/cpp/configs/analysis_example.cfg
-$ MODEL=~/source/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
+$ KATAGO=path/to/katago/cpp/katago
+$ CONFIG=path/to/katago/cpp/configs/analysis_example.cfg
+$ MODEL=path/to/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
 $ LIST=csv/games.csv
 $ OUTLIST=csv/games_judged.csv
 $ FLAGS=""  # FLAGS=--keep-undecided --max-visits 50
