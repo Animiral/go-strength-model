@@ -107,18 +107,21 @@ def plot(x, y):
   # plt.bar(16.5, blunders['low'], width=0.4, color=low_color, alpha=1, align='center')
   # plt.bar(17, blunders['medium'], width=0.4, color=medium_color, alpha=1, align='center')
   # plt.bar(17.5, blunders['high'], width=0.4, color=high_color, alpha=1, align='center')
-  plt.text((x[ddk][-1]+x[ddk][0]) / 2, 0.00005, "DDK", horizontalalignment='center', size=20, color=low_color)
-  plt.text((x[sdk][-1]+x[sdk][0]) / 2, 0.00005, "SDK", horizontalalignment='center', size=20, color=medium_color)
-  plt.text((x[dan][-1]+x[dan][0]) / 2, 0.00005, "DAN", horizontalalignment='center', size=20, color=high_color)
+  if x[ddk].size > 0:
+    plt.text((x[ddk][-1]+x[ddk][0]) / 2, 0.00005, "DDK", horizontalalignment='center', size=20, color=low_color)
+  if x[sdk].size > 0:
+    plt.text((x[sdk][-1]+x[sdk][0]) / 2, 0.00005, "SDK", horizontalalignment='center', size=20, color=medium_color)
+  if x[dan].size > 0:
+    plt.text((x[dan][-1]+x[dan][0]) / 2, 0.00005, "DAN", horizontalalignment='center', size=20, color=high_color)
 
   # 2nd x-axis tick set for ranks
   axes = plt.gca()
   rank_axis = axes.twiny()
   # print(f"Set xlim to {axes.get_xlim()} -> {(rank(axes.get_xlim()[0]), rank(axes.get_xlim()[1]))}")
-  rank_axis.set_xlim(axes.get_xlim()[0], axes.get_xlim()[1])
   # rank_ticks = rank(np.linspace(start=min(x), stop=max(x), num=10))
-  rank_ticks = np.array([10, 15, 20, 25, 30, 34]) #, 39
+  rank_ticks = np.array([0, 10, 15, 20, 25, 30, 34, 39])
   rank_axis.set_xticks(to_rating(rank_ticks))
+  rank_axis.set_xlim(axes.get_xlim()[0], axes.get_xlim()[1])
   rank_axis.set_xticklabels(rankstr(r) for r in rank_ticks)
   rank_axis.set_label('Rank')
 

@@ -1,3 +1,93 @@
+2024-02-12 18:02:54+0100: Running with following config:
+logDir = analysis_logs
+numAnalysisThreads = 2
+numSearchThreads = 16
+recentMovesWindowSize = 1000
+trainingBatchSize = 100
+trainingEpochs = 50
+trainingFraction = 0.8
+trainingLearnrate = 0.0000001
+trainingSteps = 100
+trainingWeightPenalty = 0.1
+validationFraction = 0.1
+
+2024-02-12 18:02:54+0100: Training configuration: 0.80 trainingFraction, 0.10 validationFraction, 50 epochs, 100 steps, 100 batchsize, 0.100000 weight penalty, 0.000000 learnrate. 1000 recentMovesWindowSize
+2024-02-12 18:02:54+0100: --------------
+2024-02-12 18:02:54+0100: WARNING: Config had unused keys! You may have a typo, an option you specified is being unused from /home/user/source/katago/cpp/configs/strength_analysis_example.cfg
+2024-02-12 18:02:54+0100: WARNING: Unused key 'numSearchThreads' in /home/user/source/katago/cpp/configs/strength_analysis_example.cfg
+2024-02-12 18:02:54+0100: --------------
+--------------
+WARNING: Config had unused keys! You may have a typo, an option you specified is being unused from /home/user/source/katago/cpp/configs/strength_analysis_example.cfg
+WARNING: Unused key 'numSearchThreads' in /home/user/source/katago/cpp/configs/strength_analysis_example.cfg
+--------------
+2024-02-12 18:02:54+0100: Loaded config /home/user/source/katago/cpp/configs/strength_analysis_example.cfg
+2024-02-12 18:02:54+0100: Strength Training starting...
+2024-02-12 18:02:54+0100: KataGo v1.13.2
+2024-02-12 18:02:54+0100: Loaded dataset with 1852 games from csv/games_labels.csv
+2024-02-12 18:02:54+0100: Loading strength model /home/user/source/katago/models/strength-model.bin
+[New Thread 0x7fffbfd5e000 (LWP 14915)]
+[New Thread 0x7fffbf55d000 (LWP 14916)]
+[New Thread 0x7fffbeabb000 (LWP 14917)]
+Could not load existing strength model from /home/user/source/katago/models/strength-model.bin: /home/user/source/katago/models/strength-model.bin is not a strength model file. Random-initializing new strength model.
+Epoch 0: sqrt_mse_T=482.39, alpha_T=0.661, lbd_T=-0.64, sqrt_mse_V=522.53, alpha_V=0.734, lbd_V=-0.62, theta^2=0.0835, grad^2=1381.3967
+Epoch 1: sqrt_mse_T=474.53, alpha_T=0.657, lbd_T=-0.64, sqrt_mse_V=514.20, alpha_V=0.723, lbd_V=-0.62, theta^2=0.0835, grad^2=1118.2494
+Epoch 2: sqrt_mse_T=468.01, alpha_T=0.657, lbd_T=-0.64, sqrt_mse_V=507.18, alpha_V=0.717, lbd_V=-0.62, theta^2=0.0835, grad^2=1036.3539
+Epoch 3: sqrt_mse_T=462.95, alpha_T=0.658, lbd_T=-0.64, sqrt_mse_V=501.67, alpha_V=0.717, lbd_V=-0.62, theta^2=0.0835, grad^2=848.6789
+Epoch 4: sqrt_mse_T=458.65, alpha_T=0.659, lbd_T=-0.64, sqrt_mse_V=496.91, alpha_V=0.717, lbd_V=-0.62, theta^2=0.0835, grad^2=774.3198
+Epoch 5: sqrt_mse_T=455.22, alpha_T=0.659, lbd_T=-0.64, sqrt_mse_V=493.06, alpha_V=0.712, lbd_V=-0.62, theta^2=0.0835, grad^2=616.2510
+Epoch 6: sqrt_mse_T=452.72, alpha_T=0.655, lbd_T=-0.64, sqrt_mse_V=490.12, alpha_V=0.707, lbd_V=-0.62, theta^2=0.0835, grad^2=564.8487
+Epoch 7: sqrt_mse_T=450.71, alpha_T=0.657, lbd_T=-0.64, sqrt_mse_V=487.65, alpha_V=0.701, lbd_V=-0.63, theta^2=0.0834, grad^2=537.9320
+Epoch 8: sqrt_mse_T=449.04, alpha_T=0.658, lbd_T=-0.64, sqrt_mse_V=485.69, alpha_V=0.690, lbd_V=-0.63, theta^2=0.0834, grad^2=462.5675
+Epoch 9: sqrt_mse_T=447.71, alpha_T=0.657, lbd_T=-0.64, sqrt_mse_V=484.00, alpha_V=0.696, lbd_V=-0.63, theta^2=0.0834, grad^2=423.6061
+Epoch 10: sqrt_mse_T=446.83, alpha_T=0.655, lbd_T=-0.64, sqrt_mse_V=482.80, alpha_V=0.696, lbd_V=-0.63, theta^2=0.0834, grad^2=399.7727
+Epoch 11: sqrt_mse_T=446.21, alpha_T=0.655, lbd_T=-0.64, sqrt_mse_V=481.87, alpha_V=0.690, lbd_V=-0.63, theta^2=0.0834, grad^2=369.2200
+Epoch 12: sqrt_mse_T=445.71, alpha_T=0.654, lbd_T=-0.65, sqrt_mse_V=481.04, alpha_V=0.690, lbd_V=-0.63, theta^2=0.0834, grad^2=334.5408
+Epoch 13: sqrt_mse_T=445.52, alpha_T=0.654, lbd_T=-0.65, sqrt_mse_V=480.57, alpha_V=0.690, lbd_V=-0.64, theta^2=0.0834, grad^2=311.7875
+Epoch 14: sqrt_mse_T=445.66, alpha_T=0.652, lbd_T=-0.65, sqrt_mse_V=480.44, alpha_V=0.690, lbd_V=-0.64, theta^2=0.0834, grad^2=310.0004
+Epoch 15: sqrt_mse_T=445.55, alpha_T=0.651, lbd_T=-0.65, sqrt_mse_V=480.09, alpha_V=0.679, lbd_V=-0.64, theta^2=0.0834, grad^2=270.1039
+Epoch 16: sqrt_mse_T=445.71, alpha_T=0.650, lbd_T=-0.65, sqrt_mse_V=479.98, alpha_V=0.679, lbd_V=-0.64, theta^2=0.0834, grad^2=256.0081
+Epoch 17: sqrt_mse_T=446.72, alpha_T=0.649, lbd_T=-0.65, sqrt_mse_V=479.81, alpha_V=0.679, lbd_V=-0.64, theta^2=0.0834, grad^2=233.7837
+Epoch 18: sqrt_mse_T=447.32, alpha_T=0.647, lbd_T=-0.65, sqrt_mse_V=479.91, alpha_V=0.674, lbd_V=-0.65, theta^2=0.0834, grad^2=222.0815
+Epoch 19: sqrt_mse_T=446.19, alpha_T=0.643, lbd_T=-0.66, sqrt_mse_V=479.71, alpha_V=0.674, lbd_V=-0.65, theta^2=0.0834, grad^2=207.9956
+Epoch 20: sqrt_mse_T=446.59, alpha_T=0.640, lbd_T=-0.66, sqrt_mse_V=479.88, alpha_V=0.668, lbd_V=-0.65, theta^2=0.0834, grad^2=206.6823
+Epoch 21: sqrt_mse_T=447.12, alpha_T=0.641, lbd_T=-0.66, sqrt_mse_V=480.15, alpha_V=0.668, lbd_V=-0.65, theta^2=0.0834, grad^2=204.7688
+Epoch 22: sqrt_mse_T=447.62, alpha_T=0.640, lbd_T=-0.66, sqrt_mse_V=480.49, alpha_V=0.668, lbd_V=-0.66, theta^2=0.0834, grad^2=185.3574
+Epoch 23: sqrt_mse_T=448.05, alpha_T=0.639, lbd_T=-0.66, sqrt_mse_V=480.72, alpha_V=0.674, lbd_V=-0.66, theta^2=0.0834, grad^2=170.9796
+Epoch 24: sqrt_mse_T=449.25, alpha_T=0.636, lbd_T=-0.66, sqrt_mse_V=480.97, alpha_V=0.668, lbd_V=-0.66, theta^2=0.0834, grad^2=162.3854
+Epoch 25: sqrt_mse_T=448.97, alpha_T=0.632, lbd_T=-0.67, sqrt_mse_V=481.22, alpha_V=0.663, lbd_V=-0.66, theta^2=0.0834, grad^2=145.9916
+Epoch 26: sqrt_mse_T=449.51, alpha_T=0.628, lbd_T=-0.67, sqrt_mse_V=481.55, alpha_V=0.663, lbd_V=-0.66, theta^2=0.0834, grad^2=142.9795
+Epoch 27: sqrt_mse_T=450.13, alpha_T=0.624, lbd_T=-0.67, sqrt_mse_V=482.01, alpha_V=0.658, lbd_V=-0.67, theta^2=0.0834, grad^2=131.0219
+Epoch 28: sqrt_mse_T=450.65, alpha_T=0.619, lbd_T=-0.67, sqrt_mse_V=482.35, alpha_V=0.652, lbd_V=-0.67, theta^2=0.0834, grad^2=131.9761
+Epoch 29: sqrt_mse_T=451.25, alpha_T=0.618, lbd_T=-0.67, sqrt_mse_V=482.78, alpha_V=0.647, lbd_V=-0.67, theta^2=0.0834, grad^2=123.3853
+Epoch 30: sqrt_mse_T=451.80, alpha_T=0.614, lbd_T=-0.68, sqrt_mse_V=483.15, alpha_V=0.636, lbd_V=-0.67, theta^2=0.0834, grad^2=113.6735
+Epoch 31: sqrt_mse_T=452.18, alpha_T=0.610, lbd_T=-0.68, sqrt_mse_V=483.36, alpha_V=0.636, lbd_V=-0.67, theta^2=0.0834, grad^2=105.7717
+Epoch 32: sqrt_mse_T=452.80, alpha_T=0.605, lbd_T=-0.68, sqrt_mse_V=483.79, alpha_V=0.625, lbd_V=-0.68, theta^2=0.0834, grad^2=101.7189
+Epoch 33: sqrt_mse_T=453.27, alpha_T=0.601, lbd_T=-0.68, sqrt_mse_V=484.10, alpha_V=0.625, lbd_V=-0.68, theta^2=0.0834, grad^2=99.8902
+Epoch 34: sqrt_mse_T=453.60, alpha_T=0.601, lbd_T=-0.68, sqrt_mse_V=484.25, alpha_V=0.625, lbd_V=-0.68, theta^2=0.0834, grad^2=86.8086
+Epoch 35: sqrt_mse_T=454.09, alpha_T=0.595, lbd_T=-0.68, sqrt_mse_V=484.58, alpha_V=0.609, lbd_V=-0.68, theta^2=0.0834, grad^2=89.1532
+Epoch 36: sqrt_mse_T=454.53, alpha_T=0.584, lbd_T=-0.68, sqrt_mse_V=484.84, alpha_V=0.609, lbd_V=-0.68, theta^2=0.0834, grad^2=80.7663
+Epoch 37: sqrt_mse_T=455.09, alpha_T=0.581, lbd_T=-0.69, sqrt_mse_V=485.24, alpha_V=0.603, lbd_V=-0.69, theta^2=0.0834, grad^2=82.8087
+Epoch 38: sqrt_mse_T=455.55, alpha_T=0.574, lbd_T=-0.69, sqrt_mse_V=485.57, alpha_V=0.603, lbd_V=-0.69, theta^2=0.0834, grad^2=71.8364
+Epoch 39: sqrt_mse_T=455.97, alpha_T=0.572, lbd_T=-0.69, sqrt_mse_V=485.83, alpha_V=0.592, lbd_V=-0.69, theta^2=0.0834, grad^2=69.0373
+Epoch 40: sqrt_mse_T=456.40, alpha_T=0.565, lbd_T=-0.69, sqrt_mse_V=486.13, alpha_V=0.592, lbd_V=-0.69, theta^2=0.0834, grad^2=68.5983
+Epoch 41: sqrt_mse_T=456.90, alpha_T=0.560, lbd_T=-0.69, sqrt_mse_V=486.49, alpha_V=0.592, lbd_V=-0.69, theta^2=0.0834, grad^2=65.8020
+Epoch 42: sqrt_mse_T=457.39, alpha_T=0.559, lbd_T=-0.69, sqrt_mse_V=486.85, alpha_V=0.582, lbd_V=-0.69, theta^2=0.0834, grad^2=68.7893
+Epoch 43: sqrt_mse_T=457.87, alpha_T=0.551, lbd_T=-0.69, sqrt_mse_V=487.22, alpha_V=0.576, lbd_V=-0.70, theta^2=0.0834, grad^2=64.1313
+Epoch 44: sqrt_mse_T=459.47, alpha_T=0.545, lbd_T=-0.70, sqrt_mse_V=487.56, alpha_V=0.571, lbd_V=-0.70, theta^2=0.0834, grad^2=56.8355
+Epoch 45: sqrt_mse_T=458.71, alpha_T=0.539, lbd_T=-0.70, sqrt_mse_V=487.80, alpha_V=0.565, lbd_V=-0.70, theta^2=0.0834, grad^2=52.7274
+Epoch 46: sqrt_mse_T=459.10, alpha_T=0.539, lbd_T=-0.70, sqrt_mse_V=488.07, alpha_V=0.554, lbd_V=-0.70, theta^2=0.0834, grad^2=52.5122
+Epoch 47: sqrt_mse_T=459.47, alpha_T=0.536, lbd_T=-0.70, sqrt_mse_V=488.34, alpha_V=0.543, lbd_V=-0.70, theta^2=0.0834, grad^2=53.6583
+Epoch 48: sqrt_mse_T=459.85, alpha_T=0.530, lbd_T=-0.70, sqrt_mse_V=488.56, alpha_V=0.533, lbd_V=-0.70, theta^2=0.0834, grad^2=48.8685
+Epoch 49: sqrt_mse_T=460.13, alpha_T=0.528, lbd_T=-0.70, sqrt_mse_V=488.75, alpha_V=0.527, lbd_V=-0.70, theta^2=0.0834, grad^2=45.0348
+2024-02-12 18:18:54+0100: All cleaned up, quitting
+
+
+
+
+
+======================= RUN 3.2.
+
+
 /strength-model.bin -config /home/user/source/katago/cpp/configs/strength_analysis_example.cfg -list games_labels.csv -featuredir featurecache
 [Thread debugging using libthread_db enabled]
 Using host libthread_db library "/lib/x86_64-linux-gnu/libthread_db.so.1".
