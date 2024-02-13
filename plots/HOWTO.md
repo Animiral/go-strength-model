@@ -21,11 +21,26 @@ First, get the rating labels and points loss for every move in the dataset using
 $ datasetviewer/datasetviewer csv/games_labels.csv featurecache
 Dataset Viewer: 1890 games read from csv/games_labels.csv (with features), ready.
 > dump csv/data-ploss.csv moves rating ploss
-Write to d-ploss.csv...
+Write to csv/data-ploss.csv...
 Done.
 > exit
 Dataset Viewer: bye!
 $ python3 plots/ploss_rating.py csv/data-ploss.csv
+```
+# Winrate Loss Overview
+
+Like the points loss plot, this shows the a-priori distribution of winrate loss per move with different ranking categories. The steps are the same.
+First, get the rating labels and winrate loss for every move in the dataset using `datasetviewer`, then pass the file name to the script `ploss_rating.py`:
+
+```
+$ datasetviewer/datasetviewer csv/games_labels.csv featurecache
+Dataset Viewer: 1890 games read from csv/games_labels.csv (with features), ready.
+> dump csv/data-wrloss.csv moves rating wrloss
+Write to csv/data-wrloss.csv...
+Done.
+> exit
+Dataset Viewer: bye!
+$ python3 plots/wrloss_rating.py csv/data-wrloss.csv
 ```
 
 # Glicko-2 Confidence
