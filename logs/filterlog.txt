@@ -1,0 +1,3 @@
+user@Linux-Mint:~/thesis/win/go-strength-model$ (cd extractor && make) && extractor/extractor ../sgfs-by-date.tar.gz dataset csv/games_7M.csv
+[==================================================] 100 %
+Done, found 7051863 eligible SGFs, rejected 19884467 of 26953190 total. 6296680 files created, 0 deleted.

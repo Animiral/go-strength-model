@@ -1,7 +1,9 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <iostream>
+#include <fstream>
 #include <string>
+#include <string_view>
 #include <regex>
 #include <vector>
 #include <memory>
@@ -11,40 +13,89 @@
 
 using std::cout;
 using std::string;
+using std::string_view;
 using Global::strprintf;
+
+const bool DRY_RUN = false;  // just print found games and what would be created/deleted
 
 namespace {
 
+struct CsvLine {
+    string path;
+    string blackName;
+    string whiteName;
+    string result;
+};
+
+void printMessage(std::ostream& stream, const string_view& v);
+void updateProgressBar(size_t current, size_t total);
+// If the playerName has any irregular characters in it, return a different name with only letters and digits.
+string compatibleName(const string& playerName);
 string makeFilePath(const string& basedir, string date, const string& gameid, const string& blackName, const string& whiteName);
 // Return true if the SGF data can be admitted into our dataset, and if so, fill the filePath based on baseDir.
-bool isSgfEligible(const string& content, const string& basedir, string& filePath);
-void extractAndProcess(const std::string& tarPath, const std::string& basedir);
+bool isSgfEligible(const string& content, const string& basedir, CsvLine& csvLine);
+void extractAndProcess(const std::string& tarPath, const std::string& basedir, const std::string& csvPath);
 
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " <tar.gz path> <basedir>" << std::endl;
+    if (argc < 4) {
+        std::cerr << "Usage: " << argv[0] << " <tar.gz path> <basedir> <.csv path>" << std::endl;
         return 1;
     }
 
     const std::string tarPath = argv[1];
     const std::string basedir = argv[2];
+    const std::string csvPath = argv[3];
 
-    extractAndProcess(tarPath, basedir);
+    extractAndProcess(tarPath, basedir, csvPath);
 
     return 0;
 }
 
 namespace {
 
+void printMessage(std::ostream& stream, const string_view& v) {
+    stream << "\r\033[J" << v; // messages should end in newline and followed by progress bar update
+}
+
+void updateProgressBar(size_t current, size_t total) {
+    float progress = (float)current / total;
+    int barWidth = 50;
+
+    std::cout << "\r"; // move cursor back to the beginning of the line
+    std::cout << "["; // Start of progress bar
+
+    int pos = barWidth * progress;
+    for (int i = 0; i < barWidth; ++i) {
+        if (i < pos) std::cout << "=";
+        else if (i == pos) std::cout << ">";
+        else std::cout << " ";
+    }
+    std::cout << "] " << int(progress * 100.0) << " %";
+    std::flush(std::cout); // ensure the progress bar is updated immediately
+}
+
+string compatibleName(const string& playerName) {
+    const char* allowedChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
+
+    for(char c : playerName) {
+        if(!contains(allowedChars, c)) {
+            size_t hashvalue = std::hash<std::string>{}(playerName);
+            return Global::strprintf("p%zu", hashvalue);
+        }
+    }
+
+    return playerName;
+}
+
 string makeFilePath(const string& basedir, string date, const string& gameid, const string& blackName, const string& whiteName) {
     Global::replaceAll(date, "-", "/");
     return Global::strprintf("%s/%s/%s-%s-%s.sgf",
-        basedir.c_str(), date.c_str(), gameid.c_str(), blackName.c_str(), whiteName.c_str());
+        basedir.c_str(), date.c_str(), gameid.c_str(), compatibleName(blackName).c_str(), compatibleName(whiteName).c_str());
 }
 
-bool isSgfEligible(const string& content, const string& basedir, string& filePath) {
+bool isSgfEligible(const string& content, const string& basedir, CsvLine& csvLine) {
     std::unique_ptr<Sgf> sgf;
     try {
         sgf.reset(Sgf::parse(content));
@@ -67,11 +118,17 @@ bool isSgfEligible(const string& content, const string& basedir, string& filePat
             i--;
         gameid = gameid.substr(i+1);
     }
-    // player names: remainder of the file name
-    string blackName = sgf->getPlayerName(P_BLACK);
-    string whiteName = sgf->getPlayerName(P_WHITE);
-
-    filePath = makeFilePath(basedir, date, gameid, blackName, whiteName);
+    try {
+        // player names: remainder of the file name
+        csvLine.blackName = sgf->getPlayerName(P_BLACK);
+        csvLine.whiteName = sgf->getPlayerName(P_WHITE);
+        csvLine.path = makeFilePath(basedir, date, gameid, csvLine.blackName, csvLine.whiteName);
+        csvLine.result = root->getSingleProperty("RE"); // for CSV entry
+    }
+    catch(const IOError& e) {
+        e; // don't even care
+        return false;
+    }
 
     // FILTER: only allow 19x19
     try {
@@ -143,20 +200,20 @@ bool isSgfEligible(const string& content, const string& basedir, string& filePat
     //   RE[B+F]   - black wins by forfeit
     //   RE[W+T]   - white wins by time
     static const std::regex result_pattern("[wWbB]\\+[TR\\d]");
-    string result = root->getSingleProperty("RE");
-    if(!std::regex_search(result, result_pattern)) {
+    if(!std::regex_search(csvLine.result, result_pattern)) {
         return false;
     }
 
-    bool isExists = FileUtils::exists(filePath);
+    bool isExists = FileUtils::exists(csvLine.path);
     // File,Player White,Player Black,Winner
-    std::cout << strprintf("%s: %s vs %s: %s | %s\n",
-        filePath.c_str(), blackName.c_str(), whiteName.c_str(), result.c_str(), isExists ? "exists" : "notfound");
+    printMessage(std::cout, strprintf("%s: %s vs %s: %s | %s\n",
+        csvLine.path.c_str(), csvLine.blackName.c_str(), csvLine.whiteName.c_str(),
+        csvLine.result.c_str(), isExists ? "exists" : "notfound"));
 
     return true;
 }
 
-void extractAndProcess(const std::string& tarPath, const std::string& basedir) {
+void extractAndProcess(const std::string& tarPath, const std::string& basedir, const std::string& csvPath) {
     struct archive* a;
     struct archive_entry* entry;
     int r;
@@ -170,6 +227,13 @@ void extractAndProcess(const std::string& tarPath, const std::string& basedir) {
         return;
     }
 
+    std::ofstream csvFile(csvPath, std::ios::out | std::ios::trunc);
+    csvFile << "File,Player Black,Player White,Winner\n";
+
+    std::ifstream archivefile(tarPath, std::ifstream::ate | std::ifstream::binary);
+    auto totalSize = archivefile.tellg();
+    archivefile.close();
+    decltype(totalSize) processedSize = 0; // for progress bar
 
     size_t count = 0; // all read archive entries
     size_t eligibleCount = 0; // files which belong in dataset
@@ -181,11 +245,15 @@ void extractAndProcess(const std::string& tarPath, const std::string& basedir) {
         string entryPath = archive_entry_pathname(entry);
         string content;
         const auto fileSize = archive_entry_size(entry);
+    // cout << "file size = " << fileSize << "\n";
+    // std::cin >> ccc;
+        processedSize += fileSize;
+        updateProgressBar(processedSize, totalSize);
         content.resize(fileSize);
 
         r = archive_read_data(a, content.data(), fileSize);
         if (r < 0) {
-            std::cerr << "Failed to read file content: " << entryPath << "\n";
+            printMessage(std::cerr, "Failed to read file content: " + entryPath + "\n");
             continue;
         }
         if (0 == r) { // directories etc
@@ -193,30 +261,41 @@ void extractAndProcess(const std::string& tarPath, const std::string& basedir) {
         }
 
         // Process the file content
-        string filePath;
-        bool isEligible = isSgfEligible(content, basedir, filePath);
+        CsvLine csvLine;
+        bool isEligible = isSgfEligible(content, basedir, csvLine);
         if(isEligible) {
-            if(!FileUtils::exists(filePath)) {
-                // std::cout << "Would create: " << filePath << "\n";
-                // string dir = FileUtils::dirname(filePath);
-                // if(FileUtils::create_directories(dir)) {
-                //     std::ofstream stream(filePath);
-                //     stream << content;
-                //     stream.close();
-                // }
-                // else {
-                //     std::cerr << "Failed to create dir: " << dir << "\n";
-                // }
+            if(!FileUtils::exists(csvLine.path)) {
+                if(DRY_RUN) {
+                    printMessage(std::cout, "Would create: " + csvLine.path + "\n");
+                }
+                else {
+                    string dir = FileUtils::dirname(csvLine.path);
+                    if(FileUtils::create_directories(dir)) {
+                        std::ofstream stream;
+                        FileUtils::open(stream, csvLine.path.c_str()); // raises exception when fail
+                        stream << content;
+                        stream.close();
+                    }
+                    else {
+                        printMessage(std::cerr, "Failed to create dir: " + dir + "\n");
+                    }
+                }
                 createCount++;
             }
+            csvFile << Global::strprintf("%s,%s,%s,%s\n",
+                csvLine.path.c_str(), csvLine.blackName.c_str(), csvLine.whiteName.c_str(), csvLine.result.c_str());
             eligibleCount++;
         }
         else {
-            if(FileUtils::exists(filePath)) {
-                // std::cout << "Would delete: " << filePath << "\n";
-                // if(!FileUtils::tryRemoveFile(filePath)) {
-                //     std::cerr << "Failed to delete: " << filePath << "\n";
-                // }
+            if(FileUtils::exists(csvLine.path)) {
+                if(DRY_RUN) {
+                    printMessage(std::cout, "Would delete: " + csvLine.path + "\n");
+                }
+                else {
+                    if(!FileUtils::tryRemoveFile(csvLine.path)) {
+                        printMessage(std::cerr, "Failed to delete: " + csvLine.path + "\n");
+                    }
+                }
                 deleteCount++;
             }
             rejectCount++;
@@ -227,8 +306,10 @@ void extractAndProcess(const std::string& tarPath, const std::string& basedir) {
     }
 
     archive_read_free(a);
+    csvFile.close();
 
-    std::cout << Global::strprintf("Done, found %d eligible SGFs, rejected %d of %d total. %d files created, %d deleted.\n",
+    updateProgressBar(1, 1);
+    cout << Global::strprintf("\nDone, found %d eligible SGFs, rejected %d of %d total. %d files created, %d deleted.\n",
         eligibleCount, rejectCount, count, createCount, deleteCount);
 }
 

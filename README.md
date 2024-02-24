@@ -39,15 +39,40 @@ We start by preparing the games which we want to use in training. We assume that
 
 ## Filtering Games
 
-The `sgffilter.py` script provided in this repository traverses a given directory and all its subdirectories for SGF files. Every file that contains a suitable training game is printed to the output file. Suitable games are no-handicap even 19x19 games with more than 5 seconds per move to think, have at least 20 moves played, were decided by either counting, resignation or timeout, and contain the string "ranked" (and not "unranked") in the GC property.
+The `extractor` program provided in this repository searches through an archive of SGF files for suitable training games. Every eligible file is extracted to the dataset directory to a file path constructed from the game date specified in the SGF and the names of the players. Additionally, all SGF paths are printed to a CSV output file. Suitable games are no-handicap even 19x19 games with more than 5 seconds per move to think, have at least 20 moves played, were decided by either counting, resignation or timeout, and contain the string "ranked" (and not "unranked") in the GC property.
+
+The `extractor` must be compiled from its C++ sources, located in this repository in the `extractor` subdirectory.
 
 ```
-$ python3 python/sgffilter.py path/to/dataset more/paths/to/datasets --output csv/games.csv
+$ pushd extractor
+$ cmake .
+$ make
+$ popd
 ```
+
+Start the program with the archive file (containing SGFs), extraction base directory path and CSV output path as arguments. If those arguments are not provided, `extractor` explains itself.
+
+```
+$ mkdir dataset
+$ extractor/extractor sgfs.tar.gz dataset csv/games.csv
+```
+
+As an alternative, this project also offers a script that just builds the CSV file from all eligible SGFs in a given directory and subdirectories. See "Filtering Games (alternative)" section. The advantage of `extractor` is that it is fast and there is no need to extract a large dataset, including undesirable SGFs, to disk. Beyond that, `extractor` extracts everything using file names with characters `[a-zA-Z0-9_-]` only, for better compatibility even if the players' names include characters not allowed in the target filesystem.
 
 ## Judging Games
 
 In this optional step, we override the specified winner of each game in the list with whoever held the advantage at the end in the eyes of KataGo. The goal is to improve the quality of the training data. In reality, games are often won by the player in the worse position. This can happen if their time runs out, if they feel lost and resign, or especially among beginners, the game reaches the counting stage and is scored wrong by the players. By eliminating these factors, we concentrate on the effectiveness of the moves played.
+
+Note: If the dataset is large, it may be advisable to split it into chunks of a fixed number of lines. You can stop the evaluation process after each chunk and resume it at any time at the next chunk.
+
+```
+$ split -l 100000 csv/games_7M.csv csv/games_7M.part.
+$ header=$(head -n 1 csv/games_7M.csv)
+$ for file in csv/games_7M.part.*; do
+  sed -i "1i ${header}" "${file}"
+  done
+$ # Manually remove duplicate header from .part.aa!
+```
 
 The forked KataGo repository contains the script `judge_gameset.py`, which can read our prepared `games.csv` and output a new list with predicted winners.
 
@@ -277,3 +302,13 @@ $ katago runstrengthmodeltests
 # Plots
 
 Visual presentations of the data found in the thesis are created using scripts in the `plots` subdirectory. Consult [the associated HowTo](plots/HOWTO.md) for reproduction steps.
+
+# Miscellaneous
+
+## Filtering Games (alternative)
+
+The `sgffilter.py` script provided in this repository traverses a given directory and all its subdirectories for SGF files. Every file that contains a suitable training game is printed to the output file. Suitable games are no-handicap even 19x19 games with more than 5 seconds per move to think, have at least 20 moves played, were decided by either counting, resignation or timeout, and contain the string "ranked" (and not "unranked") in the GC property.
+
+```
+$ python3 python/sgffilter.py path/to/dataset more/paths/to/datasets --output csv/games.csv
+```
