@@ -631,6 +631,20 @@ string Sgf::getPlayerName(Player pla) const {
   return "";
 }
 
+string Sgf::getPlayerNameCompat(Player pla) const {
+  const string playerName = getPlayerName(pla);
+  const char* allowedChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-. ";
+
+  for(char c : playerName) {
+    if(!contains(allowedChars, c)) {
+      size_t hashvalue = std::hash<std::string>{}(playerName);
+      return Global::strprintf("p%zu", hashvalue);
+    }
+  }
+
+  return playerName;
+}
+
 std::string Sgf::getRootPropertyWithDefault(const std::string& property, const std::string& defaultRet) const {
   if(nodes.size() <= 0)
     return defaultRet;

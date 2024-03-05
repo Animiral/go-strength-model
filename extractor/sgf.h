@@ -78,6 +78,8 @@ struct Sgf {
   int getRank(Player pla) const; //dan ranks are 1d=0, 2d=1,... 9d=8. Kyu ranks are negative.
   int getRating(Player pla) const;
   std::string getPlayerName(Player pla) const;
+  // If the playerName has any irregular characters in it, return a different name with only letters and digits.
+  std::string getPlayerNameCompat(Player pla) const;
 
   std::string getRootPropertyWithDefault(const std::string& property, const std::string& defaultRet) const;
 

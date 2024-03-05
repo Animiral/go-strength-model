@@ -30,8 +30,6 @@ struct CsvLine {
 
 void printMessage(std::ostream& stream, const string_view& v);
 void updateProgressBar(size_t current, size_t total);
-// If the playerName has any irregular characters in it, return a different name with only letters and digits.
-string compatibleName(const string& playerName);
 string makeFilePath(const string& basedir, string date, const string& gameid, const string& blackName, const string& whiteName);
 // Return true if the SGF data can be admitted into our dataset, and if so, fill the filePath based on baseDir.
 bool isSgfEligible(const string& content, const string& basedir, CsvLine& csvLine);
@@ -79,23 +77,10 @@ void updateProgressBar(size_t current, size_t total) {
     std::flush(std::cout); // ensure the progress bar is updated immediately
 }
 
-string compatibleName(const string& playerName) {
-    const char* allowedChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
-
-    for(char c : playerName) {
-        if(!contains(allowedChars, c)) {
-            size_t hashvalue = std::hash<std::string>{}(playerName);
-            return Global::strprintf("p%zu", hashvalue);
-        }
-    }
-
-    return playerName;
-}
-
 string makeFilePath(const string& basedir, string date, const string& gameid, const string& blackName, const string& whiteName) {
     Global::replaceAll(date, "-", "/");
     return Global::strprintf("%s/%s/%s-%s-%s.sgf",
-        basedir.c_str(), date.c_str(), gameid.c_str(), compatibleName(blackName).c_str(), compatibleName(whiteName).c_str());
+        basedir.c_str(), date.c_str(), gameid.c_str(), blackName.c_str(), whiteName.c_str());
 }
 
 bool isSgfEligible(const string& content, const string& basedir, CsvLine& csvLine) {
@@ -123,8 +108,8 @@ bool isSgfEligible(const string& content, const string& basedir, CsvLine& csvLin
     }
     try {
         // player names: remainder of the file name
-        csvLine.blackName = sgf->getPlayerName(P_BLACK);
-        csvLine.whiteName = sgf->getPlayerName(P_WHITE);
+        csvLine.blackName = sgf->getPlayerNameCompat(P_BLACK);
+        csvLine.whiteName = sgf->getPlayerNameCompat(P_WHITE);
         csvLine.path = makeFilePath(basedir, date, gameid, csvLine.blackName, csvLine.whiteName);
         csvLine.result = root->getSingleProperty("RE"); // for CSV entry
     }
