@@ -5,7 +5,7 @@
 #include "sgf.h"
 #include <regex>
 
-#include "fileutils.h"
+#include "core/fileutils.h"
 // #include "../core/sha2.h"
 
 // #include "../external/nlohmann_json/json.hpp"
@@ -361,11 +361,11 @@ XYSize Sgf::getXYSize() const {
 
   if(xSize < 1 || ySize < 1)
     propertyFail("Board size in sgf is < 1: " + s);
-  if(xSize > Board::MAX_LEN || ySize > Board::MAX_LEN)
-    propertyFail(
-      "Board size in sgf is > Board::MAX_LEN = " + Global::intToString((int)Board::MAX_LEN) +
-      ", if larger sizes are desired, consider increasing and recompiling: " + s
-    );
+  // if(xSize > Board::MAX_LEN || ySize > Board::MAX_LEN)
+  //   propertyFail(
+  //     "Board size in sgf is > Board::MAX_LEN = " + Global::intToString((int)Board::MAX_LEN) +
+  //     ", if larger sizes are desired, consider increasing and recompiling: " + s
+  //   );
   return XYSize(xSize,ySize);
 }
 
@@ -1560,37 +1560,37 @@ Rules CompactSgf::getRulesOrWarn(const Rules& defaultRules, std::function<void(c
 }
 
 
-// void CompactSgf::setupInitialBoardAndHist(const Rules& initialRules, Board& board, Player& nextPla, BoardHistory& hist) const {
-//   Color plPlayer = rootNode.getPLSpecifiedColor();
-//   if(plPlayer == P_BLACK || plPlayer == P_WHITE)
-//     nextPla = plPlayer;
-//   else {
-//     bool hasBlack = false;
-//     bool allBlack = true;
-//     for(int i = 0; i<placements.size(); i++) {
-//       if(placements[i].pla == P_BLACK)
-//         hasBlack = true;
-//       else
-//         allBlack = false;
-//     }
-//     if(hasBlack && allBlack)
-//       nextPla = P_WHITE;
-//     else
-//       nextPla = P_BLACK;
-//   }
+void CompactSgf::setupInitialBoardAndHist(const Rules& initialRules, Board& board, Player& nextPla, BoardHistory& hist) const {
+  Color plPlayer = rootNode.getPLSpecifiedColor();
+  if(plPlayer == P_BLACK || plPlayer == P_WHITE)
+    nextPla = plPlayer;
+  else {
+    bool hasBlack = false;
+    bool allBlack = true;
+    for(int i = 0; i<placements.size(); i++) {
+      if(placements[i].pla == P_BLACK)
+        hasBlack = true;
+      else
+        allBlack = false;
+    }
+    if(hasBlack && allBlack)
+      nextPla = P_WHITE;
+    else
+      nextPla = P_BLACK;
+  }
 
-//   // Override with the actual color of the move, if it exists
-//   if(moves.size() > 0)
-//     nextPla = moves[0].pla;
+  // Override with the actual color of the move, if it exists
+  if(moves.size() > 0)
+    nextPla = moves[0].pla;
 
-//   board = Board(xSize,ySize);
-//   bool suc = board.setStonesFailIfNoLibs(placements);
-//   if(!suc)
-//     throw StringError("setupInitialBoardAndHist: initial board position contains invalid stones or zero-liberty stones");
-//   hist = BoardHistory(board,nextPla,initialRules,0);
-//   if(hist.initialTurnNumber < board.numStonesOnBoard())
-//     hist.initialTurnNumber = board.numStonesOnBoard();
-// }
+  board = Board(xSize,ySize);
+  bool suc = board.setStonesFailIfNoLibs(placements);
+  if(!suc)
+    throw StringError("setupInitialBoardAndHist: initial board position contains invalid stones or zero-liberty stones");
+  hist = BoardHistory(board,nextPla,initialRules,0);
+  if(hist.initialTurnNumber < board.numStonesOnBoard())
+    hist.initialTurnNumber = board.numStonesOnBoard();
+}
 
 // void CompactSgf::playMovesAssumeLegal(Board& board, Player& nextPla, BoardHistory& hist, int64_t turnIdx) const {
 //   if(turnIdx < 0 || turnIdx > (int64_t)moves.size())

@@ -1,12 +1,8 @@
-/*
- * Adapted from KataGo: https://github.com/lightvector/KataGo
- */
-
 #ifndef GAME_RULES_H_
 #define GAME_RULES_H_
 
-#include "global.h"
-// #include "../core/hash.h"
+#include "../core/global.h"
+#include "../core/hash.h"
 
 // #include "../external/nlohmann_json/json.hpp"
 
@@ -100,11 +96,11 @@ struct Rules {
   // nlohmann::json toJsonNoKomi() const;
   // nlohmann::json toJsonNoKomiMaybeOmitStuff() const;
 
-  // static const Hash128 ZOBRIST_KO_RULE_HASH[4];
-  // static const Hash128 ZOBRIST_SCORING_RULE_HASH[2];
-  // static const Hash128 ZOBRIST_TAX_RULE_HASH[3];
-  // static const Hash128 ZOBRIST_MULTI_STONE_SUICIDE_HASH;
-  // static const Hash128 ZOBRIST_BUTTON_HASH;
+  static const Hash128 ZOBRIST_KO_RULE_HASH[4];
+  static const Hash128 ZOBRIST_SCORING_RULE_HASH[2];
+  static const Hash128 ZOBRIST_TAX_RULE_HASH[3];
+  static const Hash128 ZOBRIST_MULTI_STONE_SUICIDE_HASH;
+  static const Hash128 ZOBRIST_BUTTON_HASH;
 
 private:
   // nlohmann::json toJsonHelper(bool omitKomi, bool omitDefaults) const;

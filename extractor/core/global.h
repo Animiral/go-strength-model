@@ -1,8 +1,4 @@
 /*
- * Adapted from KataGo: https://github.com/lightvector/KataGo
- */
-
-/*
  * global.h
  * Author: David Wu
  *
@@ -111,7 +107,6 @@ namespace Global
   //Trim whitespace off both ends of string
   std::string trim(const std::string& s, const char* delims = " \t\r\n\v\f");
 
-  //Replace all occurrences in-place
   void replaceAll(std::string& str, const std::string& from, const std::string& to);
 
   //Join strings with a delimiter between each one, from [start,end)

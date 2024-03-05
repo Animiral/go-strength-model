@@ -1,38 +1,21 @@
-/*
- * Adapted from KataGo: https://github.com/lightvector/KataGo
- */
-
-#include "fileutils.h"
+#include "../core/fileutils.h"
 
 #include <fstream>
 #include <iomanip>
 #include <limits>
-#include <zlib.h>
+// #include <zlib.h>
 // #include <ghc/filesystem.hpp>
 #include <filesystem>
 
-#include "global.h"
-// #include "../core/sha2.h"
-// #include "../core/test.h"
+#include "../core/global.h"
+#include "../core/sha2.h"
+#include "../core/test.h"
 
 // namespace gfs = ghc::filesystem;
 namespace gfs = std::filesystem;
 
 //------------------------
-// #include "../core/using.h"
-using std::vector;
-using std::string;
-using std::cout;
-using std::cerr;
-using std::cin;
-using std::endl;
-using std::istream;
-using std::ostream;
-using std::ifstream;
-using std::ofstream;
-using std::ostringstream;
-using std::istringstream;
-using std::pair;
+#include "../core/using.h"
 //------------------------
 
 bool FileUtils::exists(const string& path) {
@@ -169,18 +152,18 @@ void FileUtils::loadFileIntoString(const string& filename, const string& expecte
   in.read(&str[0], fileSize);
   in.close();
 
-  // if(expectedSha256 != "" || actualSha256Buf != NULL) {
-  //   char hashResultBuf[65];
-  //   SHA2::get256((const uint8_t*)str.data(), str.size(), hashResultBuf);
-  //   string hashResult(hashResultBuf);
-  //   if(expectedSha256 != "") {
-  //     bool matching = Global::toLower(expectedSha256) == Global::toLower(hashResult);
-  //     if(!matching)
-  //       throw StringError("File " + filename + " sha256 was " + hashResult + " which does not match the expected sha256 " + expectedSha256);
-  //   }
-  //   if(actualSha256Buf != NULL)
-  //     *actualSha256Buf = hashResult;
-  // }
+  if(expectedSha256 != "" || actualSha256Buf != NULL) {
+    char hashResultBuf[65];
+    SHA2::get256((const uint8_t*)str.data(), str.size(), hashResultBuf);
+    string hashResult(hashResultBuf);
+    if(expectedSha256 != "") {
+      bool matching = Global::toLower(expectedSha256) == Global::toLower(hashResult);
+      if(!matching)
+        throw StringError("File " + filename + " sha256 was " + hashResult + " which does not match the expected sha256 " + expectedSha256);
+    }
+    if(actualSha256Buf != NULL)
+      *actualSha256Buf = hashResult;
+  }
 }
 
 // void FileUtils::uncompressAndLoadFileIntoString(const string& filename, const string& expectedSha256, string& uncompressed) {
@@ -210,7 +193,7 @@ void FileUtils::loadFileIntoString(const string& filename, const string& expecte
 //   //zlib can only process input chunks of size unsigned int at a time, generally 32 bit or 4 GB.
 //   //We pick a max that is a a little bit smaller than that.
 //   constexpr size_t INPUT_CHUNK_SIZE = 1073741824;
-//   // testAssert(std::numeric_limits<unsigned int>::max() > INPUT_CHUNK_SIZE);
+//   testAssert(std::numeric_limits<unsigned int>::max() > INPUT_CHUNK_SIZE);
 //   size_t totalSizeLeft = compressed->size();
 //   size_t totalAmountOfOutputProduced = 0;
 //   zs.avail_in = 0;

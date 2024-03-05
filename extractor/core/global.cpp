@@ -1,8 +1,4 @@
-/*
- * Adapted from KataGo: https://github.com/lightvector/KataGo
- */
-
-#include "global.h"
+#include "../core/global.h"
 
 /*
  * global.cpp

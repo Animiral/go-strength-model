@@ -8,8 +8,9 @@
 #include <vector>
 #include <memory>
 #include "sgf.h"
-#include "global.h"
-#include "fileutils.h"
+#include "game/board.h"
+#include "core/global.h"
+#include "core/fileutils.h"
 
 using std::cout;
 using std::string;
@@ -43,6 +44,8 @@ int main(int argc, char* argv[]) {
         std::cerr << "Usage: " << argv[0] << " <tar.gz path> <basedir> <.csv path>" << std::endl;
         return 1;
     }
+
+    Board::initHash();
 
     const std::string tarPath = argv[1];
     const std::string basedir = argv[2];
@@ -131,9 +134,9 @@ bool isSgfEligible(const string& content, const string& basedir, CsvLine& csvLin
     }
 
     // FILTER: only allow 19x19
+    XYSize boardsize = sgf->getXYSize();
     try {
-        XYSize size = sgf->getXYSize();
-        if(19 != size.x || 19 != size.y)
+        if(19 != boardsize.x || 19 != boardsize.y)
             return false;
     }
     catch(const IOError& e) {
@@ -202,6 +205,21 @@ bool isSgfEligible(const string& content, const string& basedir, CsvLine& csvLin
     static const std::regex result_pattern("[wWbB]\\+[TR\\d]");
     if(!std::regex_search(csvLine.result, result_pattern)) {
         return false;
+    }
+
+    // FILTER: all moves in the game must be legal moves
+    {
+        Rules rules = csgf->getRulesOrFailAllowUnspecified(Rules::getTrompTaylorish());
+        Board board;
+        BoardHistory history;
+        Player initialPla;
+        csgf->setupInitialBoardAndHist(rules, board, initialPla, history);
+
+        for(int turnIdx = 0; turnIdx < csgf->moves.size(); turnIdx++) {
+            Move move = csgf->moves[turnIdx];
+            if(!history.makeBoardMoveTolerant(board, move.loc, move.pla))
+              return false; // illegal move detected
+        }
     }
 
     bool isExists = FileUtils::exists(csvLine.path);

@@ -5,13 +5,13 @@
 #ifndef DATAIO_SGF_H_
 #define DATAIO_SGF_H_
 
-#include "global.h"
-#include "rules.h"
+#include "core/global.h"
+#include "game/rules.h"
 // #include "../core/hash.h"
 // #include "../core/rand.h"
 // #include "../dataio/trainingwrite.h"
-#include "board.h"
-// #include "../game/boardhistory.h"
+#include "game/board.h"
+#include "game/boardhistory.h"
 
 STRUCT_NAMED_TRIPLE(uint8_t,x,uint8_t,y,Player,pla,MoveNoBSize);
 STRUCT_NAMED_PAIR(int,x,int,y,XYSize);
@@ -224,7 +224,7 @@ struct CompactSgf {
   Rules getRulesOrFailAllowUnspecified(const Rules& defaultRules) const;
   Rules getRulesOrWarn(const Rules& defaultRules, std::function<void(const std::string& msg)> f) const;
 
-  // void setupInitialBoardAndHist(const Rules& initialRules, Board& board, Player& nextPla, BoardHistory& hist) const;
+  void setupInitialBoardAndHist(const Rules& initialRules, Board& board, Player& nextPla, BoardHistory& hist) const;
   // void playMovesAssumeLegal(Board& board, Player& nextPla, BoardHistory& hist, int64_t turnIdx) const;
   // void setupBoardAndHistAssumeLegal(const Rules& initialRules, Board& board, Player& nextPla, BoardHistory& hist, int64_t turnIdx) const;
   // //These throw a StringError upon illegal move.

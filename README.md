@@ -66,12 +66,11 @@ In this optional step, we override the specified winner of each game in the list
 Note: If the dataset is large, it may be advisable to split it into chunks of a fixed number of lines. You can stop the evaluation process after each chunk and resume it at any time at the next chunk.
 
 ```
-$ split -l 100000 csv/games_7M.csv csv/games_7M.part.
 $ header=$(head -n 1 csv/games_7M.csv)
+$ tail -n +2 csv/games_7M.csv | split -l 100000 --additional-suffix=.csv - csv/games_7M.part.
 $ for file in csv/games_7M.part.*; do
   sed -i "1i ${header}" "${file}"
   done
-$ # Manually remove duplicate header from .part.aa!
 ```
 
 The forked KataGo repository contains the script `judge_gameset.py`, which can read our prepared `games.csv` and output a new list with predicted winners.

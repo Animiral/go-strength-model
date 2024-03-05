@@ -11,7 +11,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 find_package(LibArchive REQUIRED)
 
 # Add the executable
-add_executable(extractor extractor.cpp sgf.cpp fileutils.cpp global.cpp rules.cpp board.cpp)
+add_executable(extractor extractor.cpp
+	sgf.cpp
+	core/base64.cpp         core/global.cpp       core/rand_helpers.cpp
+	core/bsearch.cpp        core/hash.cpp         core/sha2.cpp
+	core/commandloop.cpp    core/logger.cpp       core/test.cpp
+	core/config_parser.cpp  core/mainargs.cpp     core/threadsafecounter.cpp
+	core/datetime.cpp       core/threadsafequeue.cpp
+	core/elo.cpp            core/md5.cpp          core/threadtest.cpp
+	core/fancymath.cpp      core/multithread.cpp  core/timer.cpp
+	core/fileutils.cpp      core/rand.cpp
+	game/board.cpp  game/boardhistory.cpp  game/graphhash.cpp  game/rules.cpp)
 
 # Link the executable to the libarchive library
 target_link_libraries(extractor ${LibArchive_LIBRARIES})

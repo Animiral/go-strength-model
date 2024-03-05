@@ -1,8 +1,4 @@
 /*
- * Adapted from KataGo: https://github.com/lightvector/KataGo
- */
-
-/*
  * board.h
  * Originally from an unreleased project back in 2010, modified since.
  * Authors: brettharrison (original), David Wu (original and later modifications).
@@ -11,12 +7,12 @@
 #ifndef GAME_BOARD_H_
 #define GAME_BOARD_H_
 
-#include "global.h"
-// #include "../core/hash.h"
+#include "../core/global.h"
+#include "../core/hash.h"
 // #include "../external/nlohmann_json/json.hpp"
 
 #ifndef COMPILE_MAX_BOARD_LEN
-#define COMPILE_MAX_BOARD_LEN 99
+#define COMPILE_MAX_BOARD_LEN 19
 #endif
 
 //TYPES AND CONSTANTS-----------------------------------------------------------------
@@ -114,17 +110,17 @@ struct Board
 
   //Zobrist Hashing------------------------------
   static bool IS_ZOBRIST_INITALIZED;
-  // static Hash128 ZOBRIST_SIZE_X_HASH[MAX_LEN+1];
-  // static Hash128 ZOBRIST_SIZE_Y_HASH[MAX_LEN+1];
-  // static Hash128 ZOBRIST_BOARD_HASH[MAX_ARR_SIZE][4];
-  // static Hash128 ZOBRIST_BOARD_HASH2[MAX_ARR_SIZE][4];
-  // static Hash128 ZOBRIST_PLAYER_HASH[4];
-  // static Hash128 ZOBRIST_KO_LOC_HASH[MAX_ARR_SIZE];
-  // static Hash128 ZOBRIST_KO_MARK_HASH[MAX_ARR_SIZE][4];
-  // static Hash128 ZOBRIST_ENCORE_HASH[3];
-  // static Hash128 ZOBRIST_SECOND_ENCORE_START_HASH[MAX_ARR_SIZE][4];
-  // static const Hash128 ZOBRIST_PASS_ENDS_PHASE;
-  // static const Hash128 ZOBRIST_GAME_IS_OVER;
+  static Hash128 ZOBRIST_SIZE_X_HASH[MAX_LEN+1];
+  static Hash128 ZOBRIST_SIZE_Y_HASH[MAX_LEN+1];
+  static Hash128 ZOBRIST_BOARD_HASH[MAX_ARR_SIZE][4];
+  static Hash128 ZOBRIST_BOARD_HASH2[MAX_ARR_SIZE][4];
+  static Hash128 ZOBRIST_PLAYER_HASH[4];
+  static Hash128 ZOBRIST_KO_LOC_HASH[MAX_ARR_SIZE];
+  static Hash128 ZOBRIST_KO_MARK_HASH[MAX_ARR_SIZE][4];
+  static Hash128 ZOBRIST_ENCORE_HASH[3];
+  static Hash128 ZOBRIST_SECOND_ENCORE_START_HASH[MAX_ARR_SIZE][4];
+  static const Hash128 ZOBRIST_PASS_ENDS_PHASE;
+  static const Hash128 ZOBRIST_GAME_IS_OVER;
 
   //Structs---------------------------------------
 
@@ -214,7 +210,7 @@ struct Board
   int numPlaStonesOnBoard(Player pla) const;
 
   //Get a hash that combines the position of the board with simple ko prohibition and a player to move.
-  // Hash128 getSitHashWithSimpleKo(Player pla) const;
+  Hash128 getSitHashWithSimpleKo(Player pla) const;
 
   //Lift any simple ko ban recorded on thie board due to an immediate prior ko capture.
   void clearSimpleKoLoc();
@@ -253,7 +249,7 @@ struct Board
 
   //Get what the position hash would be if we were to play this move and resolve captures and suicides.
   //Assumes the move is on an empty location.
-  // Hash128 getPosHashAfterMove(Loc loc, Player pla) const;
+  Hash128 getPosHashAfterMove(Loc loc, Player pla) const;
 
   //Returns true if, for a move just played at loc, the sum of the number of stones in loc's group and the sizes of the empty regions it touches
   //are greater than bound. See also https://senseis.xmp.net/?Cycle for some interesting test cases for thinking about this bound.
@@ -325,7 +321,7 @@ struct Board
 
   /* PointList empty_list; //List of all empty locations on board */
 
-  // Hash128 pos_hash; //A zobrist hash of the current board position (does not include ko point or player to move)
+  Hash128 pos_hash; //A zobrist hash of the current board position (does not include ko point or player to move)
 
   int numBlackCaptures; //Number of b stones captured, informational and used by board history when clearing pos
   int numWhiteCaptures; //Number of w stones captured, informational and used by board history when clearing pos

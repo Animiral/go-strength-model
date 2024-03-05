@@ -1,8 +1,4 @@
-/*
- * Adapted from KataGo: https://github.com/lightvector/KataGo
- */
-
-#include "board.h"
+#include "../game/board.h"
 
 /*
  * board.cpp
@@ -16,25 +12,25 @@
 #include <iostream>
 #include <vector>
 
-// #include "../core/rand.h"
+#include "../core/rand.h"
 
 using namespace std;
 
 //STATIC VARS-----------------------------------------------------------------------------
 bool Board::IS_ZOBRIST_INITALIZED = false;
-// Hash128 Board::ZOBRIST_SIZE_X_HASH[MAX_LEN+1];
-// Hash128 Board::ZOBRIST_SIZE_Y_HASH[MAX_LEN+1];
-// Hash128 Board::ZOBRIST_BOARD_HASH[MAX_ARR_SIZE][4];
-// Hash128 Board::ZOBRIST_PLAYER_HASH[4];
-// Hash128 Board::ZOBRIST_KO_LOC_HASH[MAX_ARR_SIZE];
-// Hash128 Board::ZOBRIST_KO_MARK_HASH[MAX_ARR_SIZE][4];
-// Hash128 Board::ZOBRIST_ENCORE_HASH[3];
-// Hash128 Board::ZOBRIST_BOARD_HASH2[MAX_ARR_SIZE][4];
-// Hash128 Board::ZOBRIST_SECOND_ENCORE_START_HASH[MAX_ARR_SIZE][4];
-// const Hash128 Board::ZOBRIST_PASS_ENDS_PHASE = //Based on sha256 hash of Board::ZOBRIST_PASS_ENDS_PHASE
-//   Hash128(0x853E097C279EBF4EULL, 0xE3153DEF9E14A62CULL);
-// const Hash128 Board::ZOBRIST_GAME_IS_OVER = //Based on sha256 hash of Board::ZOBRIST_GAME_IS_OVER
-//   Hash128(0xb6f9e465597a77eeULL, 0xf1d583d960a4ce7fULL);
+Hash128 Board::ZOBRIST_SIZE_X_HASH[MAX_LEN+1];
+Hash128 Board::ZOBRIST_SIZE_Y_HASH[MAX_LEN+1];
+Hash128 Board::ZOBRIST_BOARD_HASH[MAX_ARR_SIZE][4];
+Hash128 Board::ZOBRIST_PLAYER_HASH[4];
+Hash128 Board::ZOBRIST_KO_LOC_HASH[MAX_ARR_SIZE];
+Hash128 Board::ZOBRIST_KO_MARK_HASH[MAX_ARR_SIZE][4];
+Hash128 Board::ZOBRIST_ENCORE_HASH[3];
+Hash128 Board::ZOBRIST_BOARD_HASH2[MAX_ARR_SIZE][4];
+Hash128 Board::ZOBRIST_SECOND_ENCORE_START_HASH[MAX_ARR_SIZE][4];
+const Hash128 Board::ZOBRIST_PASS_ENDS_PHASE = //Based on sha256 hash of Board::ZOBRIST_PASS_ENDS_PHASE
+  Hash128(0x853E097C279EBF4EULL, 0xE3153DEF9E14A62CULL);
+const Hash128 Board::ZOBRIST_GAME_IS_OVER = //Based on sha256 hash of Board::ZOBRIST_GAME_IS_OVER
+  Hash128(0xb6f9e465597a77eeULL, 0xf1d583d960a4ce7fULL);
 
 //LOCATION--------------------------------------------------------------------------------
 Loc Location::getLoc(int x, int y, int x_size)
@@ -126,7 +122,7 @@ Board::Board(const Board& other)
 
   ko_loc = other.ko_loc;
   // empty_list = other.empty_list;
-  // pos_hash = other.pos_hash;
+  pos_hash = other.pos_hash;
   numBlackCaptures = other.numBlackCaptures;
   numWhiteCaptures = other.numWhiteCaptures;
 
@@ -156,7 +152,7 @@ void Board::init(int xS, int yS)
   }
 
   ko_loc = NULL_LOC;
-  // pos_hash = ZOBRIST_SIZE_X_HASH[x_size] ^ ZOBRIST_SIZE_Y_HASH[y_size];
+  pos_hash = ZOBRIST_SIZE_X_HASH[x_size] ^ ZOBRIST_SIZE_Y_HASH[y_size];
   numBlackCaptures = 0;
   numWhiteCaptures = 0;
 
@@ -167,76 +163,76 @@ void Board::initHash()
 {
   if(IS_ZOBRIST_INITALIZED)
     return;
-  // Rand rand("Board::initHash()");
+  Rand rand("Board::initHash()");
 
-  // auto nextHash = [&rand]() {
-  //   uint64_t h0 = rand.nextUInt64();
-  //   uint64_t h1 = rand.nextUInt64();
-  //   return Hash128(h0,h1);
-  // };
+  auto nextHash = [&rand]() {
+    uint64_t h0 = rand.nextUInt64();
+    uint64_t h1 = rand.nextUInt64();
+    return Hash128(h0,h1);
+  };
 
-  // for(int i = 0; i<4; i++)
-  //   ZOBRIST_PLAYER_HASH[i] = nextHash();
-  // for(int i = 0; i<3; i++)
-  //   ZOBRIST_ENCORE_HASH[i] = nextHash();
+  for(int i = 0; i<4; i++)
+    ZOBRIST_PLAYER_HASH[i] = nextHash();
+  for(int i = 0; i<3; i++)
+    ZOBRIST_ENCORE_HASH[i] = nextHash();
 
-  // //Do this second so that the player and encore hashes are not
-  // //afffected by the size of the board we compile with.
-  // for(int i = 0; i<MAX_ARR_SIZE; i++) {
-  //   for(Color j = 0; j<4; j++) {
-  //     if(j == C_EMPTY || j == C_WALL)
-  //       ZOBRIST_BOARD_HASH[i][j] = Hash128();
-  //     else
-  //       ZOBRIST_BOARD_HASH[i][j] = nextHash();
+  //Do this second so that the player and encore hashes are not
+  //afffected by the size of the board we compile with.
+  for(int i = 0; i<MAX_ARR_SIZE; i++) {
+    for(Color j = 0; j<4; j++) {
+      if(j == C_EMPTY || j == C_WALL)
+        ZOBRIST_BOARD_HASH[i][j] = Hash128();
+      else
+        ZOBRIST_BOARD_HASH[i][j] = nextHash();
 
-  //     if(j == C_EMPTY || j == C_WALL)
-  //       ZOBRIST_KO_MARK_HASH[i][j] = Hash128();
-  //     else
-  //       ZOBRIST_KO_MARK_HASH[i][j] = nextHash();
-  //   }
-  //   ZOBRIST_KO_LOC_HASH[i] = nextHash();
-  // }
+      if(j == C_EMPTY || j == C_WALL)
+        ZOBRIST_KO_MARK_HASH[i][j] = Hash128();
+      else
+        ZOBRIST_KO_MARK_HASH[i][j] = nextHash();
+    }
+    ZOBRIST_KO_LOC_HASH[i] = nextHash();
+  }
 
-  // //Reseed the random number generator so that these hashes are also
-  // //not affected by the size of the board we compile with
-  // rand.init("Board::initHash() for ZOBRIST_SECOND_ENCORE_START hashes");
-  // for(int i = 0; i<MAX_ARR_SIZE; i++) {
-  //   for(Color j = 0; j<4; j++) {
-  //     if(j == C_EMPTY || j == C_WALL)
-  //       ZOBRIST_SECOND_ENCORE_START_HASH[i][j] = Hash128();
-  //     else
-  //       ZOBRIST_SECOND_ENCORE_START_HASH[i][j] = nextHash();
-  //   }
-  // }
+  //Reseed the random number generator so that these hashes are also
+  //not affected by the size of the board we compile with
+  rand.init("Board::initHash() for ZOBRIST_SECOND_ENCORE_START hashes");
+  for(int i = 0; i<MAX_ARR_SIZE; i++) {
+    for(Color j = 0; j<4; j++) {
+      if(j == C_EMPTY || j == C_WALL)
+        ZOBRIST_SECOND_ENCORE_START_HASH[i][j] = Hash128();
+      else
+        ZOBRIST_SECOND_ENCORE_START_HASH[i][j] = nextHash();
+    }
+  }
 
-  // //Reseed the random number generator so that these size hashes are also
-  // //not affected by the size of the board we compile with
-  // rand.init("Board::initHash() for ZOBRIST_SIZE hashes");
-  // for(int i = 0; i<MAX_LEN+1; i++) {
-  //   ZOBRIST_SIZE_X_HASH[i] = nextHash();
-  //   ZOBRIST_SIZE_Y_HASH[i] = nextHash();
-  // }
+  //Reseed the random number generator so that these size hashes are also
+  //not affected by the size of the board we compile with
+  rand.init("Board::initHash() for ZOBRIST_SIZE hashes");
+  for(int i = 0; i<MAX_LEN+1; i++) {
+    ZOBRIST_SIZE_X_HASH[i] = nextHash();
+    ZOBRIST_SIZE_Y_HASH[i] = nextHash();
+  }
 
-  // //Reseed and compute one more set of zobrist hashes, mixed a bit differently
-  // rand.init("Board::initHash() for second set of ZOBRIST hashes");
-  // for(int i = 0; i<MAX_ARR_SIZE; i++) {
-  //   for(Color j = 0; j<4; j++) {
-  //     ZOBRIST_BOARD_HASH2[i][j] = nextHash();
-  //     ZOBRIST_BOARD_HASH2[i][j].hash0 = Hash::murmurMix(ZOBRIST_BOARD_HASH2[i][j].hash0);
-  //     ZOBRIST_BOARD_HASH2[i][j].hash1 = Hash::splitMix64(ZOBRIST_BOARD_HASH2[i][j].hash1);
-  //   }
-  // }
+  //Reseed and compute one more set of zobrist hashes, mixed a bit differently
+  rand.init("Board::initHash() for second set of ZOBRIST hashes");
+  for(int i = 0; i<MAX_ARR_SIZE; i++) {
+    for(Color j = 0; j<4; j++) {
+      ZOBRIST_BOARD_HASH2[i][j] = nextHash();
+      ZOBRIST_BOARD_HASH2[i][j].hash0 = Hash::murmurMix(ZOBRIST_BOARD_HASH2[i][j].hash0);
+      ZOBRIST_BOARD_HASH2[i][j].hash1 = Hash::splitMix64(ZOBRIST_BOARD_HASH2[i][j].hash1);
+    }
+  }
 
   IS_ZOBRIST_INITALIZED = true;
 }
 
-// Hash128 Board::getSitHashWithSimpleKo(Player pla) const {
-//   Hash128 h = pos_hash;
-//   if(ko_loc != Board::NULL_LOC)
-//     h = h ^ Board::ZOBRIST_KO_LOC_HASH[ko_loc];
-//   h ^= Board::ZOBRIST_PLAYER_HASH[pla];
-//   return h;
-// }
+Hash128 Board::getSitHashWithSimpleKo(Player pla) const {
+  Hash128 h = pos_hash;
+  if(ko_loc != Board::NULL_LOC)
+    h = h ^ Board::ZOBRIST_KO_LOC_HASH[ko_loc];
+  h ^= Board::ZOBRIST_PLAYER_HASH[pla];
+  return h;
+}
 
 void Board::clearSimpleKoLoc() {
   ko_loc = NULL_LOC;
@@ -838,7 +834,7 @@ void Board::undo(Board::MoveRecord record)
   }
 
   //Delete the stone played here.
-  // pos_hash ^= ZOBRIST_BOARD_HASH[loc][colors[loc]];
+  pos_hash ^= ZOBRIST_BOARD_HASH[loc][colors[loc]];
   colors[loc] = C_EMPTY;
   // empty_list.add(loc);
 
@@ -921,85 +917,85 @@ void Board::undo(Board::MoveRecord record)
   }
 }
 
-// Hash128 Board::getPosHashAfterMove(Loc loc, Player pla) const {
-//   if(loc == PASS_LOC)
-//     return pos_hash;
-//   assert(loc != NULL_LOC);
+Hash128 Board::getPosHashAfterMove(Loc loc, Player pla) const {
+  if(loc == PASS_LOC)
+    return pos_hash;
+  assert(loc != NULL_LOC);
 
-//   Hash128 hash = pos_hash;
-//   hash ^= ZOBRIST_BOARD_HASH[loc][pla];
+  Hash128 hash = pos_hash;
+  hash ^= ZOBRIST_BOARD_HASH[loc][pla];
 
-//   Player opp = getOpp(pla);
+  Player opp = getOpp(pla);
 
-//   //Count immediate liberties and groups that would be captured
-//   bool wouldBeSuicide = true;
-//   int numCapturedGroups = 0;
-//   Loc capturedGroupHeads[4];
-//   for(int i = 0; i < 4; i++) {
-//     Loc adj = loc + adj_offsets[i];
-//     if(colors[adj] == C_EMPTY)
-//       wouldBeSuicide = false;
-//     else if(colors[adj] == pla && getNumLiberties(adj) > 1)
-//       wouldBeSuicide = false;
-//     else if(colors[adj] == opp) {
-//       //Capture!
-//       if(getNumLiberties(adj) == 1) {
-//         //Make sure we haven't already counted it
-//         Loc head = chain_head[adj];
-//         bool alreadyFound = false;
-//         for(int j = 0; j<numCapturedGroups; j++) {
-//           if(capturedGroupHeads[j] == head)
-//           {alreadyFound = true; break;}
-//         }
-//         if(!alreadyFound) {
-//           capturedGroupHeads[numCapturedGroups++] = head;
-//           wouldBeSuicide = false;
+  //Count immediate liberties and groups that would be captured
+  bool wouldBeSuicide = true;
+  int numCapturedGroups = 0;
+  Loc capturedGroupHeads[4];
+  for(int i = 0; i < 4; i++) {
+    Loc adj = loc + adj_offsets[i];
+    if(colors[adj] == C_EMPTY)
+      wouldBeSuicide = false;
+    else if(colors[adj] == pla && getNumLiberties(adj) > 1)
+      wouldBeSuicide = false;
+    else if(colors[adj] == opp) {
+      //Capture!
+      if(getNumLiberties(adj) == 1) {
+        //Make sure we haven't already counted it
+        Loc head = chain_head[adj];
+        bool alreadyFound = false;
+        for(int j = 0; j<numCapturedGroups; j++) {
+          if(capturedGroupHeads[j] == head)
+          {alreadyFound = true; break;}
+        }
+        if(!alreadyFound) {
+          capturedGroupHeads[numCapturedGroups++] = head;
+          wouldBeSuicide = false;
 
-//           //Now iterate through the group to update the hash
-//           Loc cur = adj;
-//           do {
-//             hash ^= ZOBRIST_BOARD_HASH[cur][opp];
-//             cur = next_in_chain[cur];
-//           } while (cur != adj);
-//         }
-//       }
-//     }
-//   }
+          //Now iterate through the group to update the hash
+          Loc cur = adj;
+          do {
+            hash ^= ZOBRIST_BOARD_HASH[cur][opp];
+            cur = next_in_chain[cur];
+          } while (cur != adj);
+        }
+      }
+    }
+  }
 
-//   //Update hash for suicidal moves
-//   if(wouldBeSuicide) {
-//     assert(numCapturedGroups == 0);
+  //Update hash for suicidal moves
+  if(wouldBeSuicide) {
+    assert(numCapturedGroups == 0);
 
-//     for(int i = 0; i < 4; i++) {
-//       Loc adj = loc + adj_offsets[i];
-//       //Suicide capture!
-//       if(colors[adj] == pla && getNumLiberties(adj) == 1) {
-//         //Make sure we haven't already counted it
-//         Loc head = chain_head[adj];
-//         bool alreadyFound = false;
-//         for(int j = 0; j<numCapturedGroups; j++) {
-//           if(capturedGroupHeads[j] == head)
-//           {alreadyFound = true; break;}
-//         }
-//         if(!alreadyFound) {
-//           capturedGroupHeads[numCapturedGroups++] = head;
+    for(int i = 0; i < 4; i++) {
+      Loc adj = loc + adj_offsets[i];
+      //Suicide capture!
+      if(colors[adj] == pla && getNumLiberties(adj) == 1) {
+        //Make sure we haven't already counted it
+        Loc head = chain_head[adj];
+        bool alreadyFound = false;
+        for(int j = 0; j<numCapturedGroups; j++) {
+          if(capturedGroupHeads[j] == head)
+          {alreadyFound = true; break;}
+        }
+        if(!alreadyFound) {
+          capturedGroupHeads[numCapturedGroups++] = head;
 
-//           //Now iterate through the group to update the hash
-//           Loc cur = adj;
-//           do {
-//             hash ^= ZOBRIST_BOARD_HASH[cur][pla];
-//             cur = next_in_chain[cur];
-//           } while (cur != adj);
-//         }
-//       }
-//     }
+          //Now iterate through the group to update the hash
+          Loc cur = adj;
+          do {
+            hash ^= ZOBRIST_BOARD_HASH[cur][pla];
+            cur = next_in_chain[cur];
+          } while (cur != adj);
+        }
+      }
+    }
 
-//     //Don't forget the stone we'd place would also die
-//     hash ^= ZOBRIST_BOARD_HASH[loc][pla];
-//   }
+    //Don't forget the stone we'd place would also die
+    hash ^= ZOBRIST_BOARD_HASH[loc][pla];
+  }
 
-//   return hash;
-// }
+  return hash;
+}
 
 //Plays the specified move, assuming it is legal.
 void Board::playMoveAssumeLegal(Loc loc, Player pla)
@@ -1015,7 +1011,7 @@ void Board::playMoveAssumeLegal(Loc loc, Player pla)
 
   //Add the new stone as an independent group
   colors[loc] = pla;
-  // pos_hash ^= ZOBRIST_BOARD_HASH[loc][pla];
+  pos_hash ^= ZOBRIST_BOARD_HASH[loc][pla];
   chain_data[loc].owner = pla;
   chain_data[loc].num_locs = 1;
   chain_data[loc].num_liberties = getNumImmediateLiberties(loc);
@@ -1204,7 +1200,7 @@ int Board::removeChain(Loc loc)
   do
   {
     //Empty out this location
-    // pos_hash ^= ZOBRIST_BOARD_HASH[cur][colors[cur]];
+    pos_hash ^= ZOBRIST_BOARD_HASH[cur][colors[cur]];
     colors[cur] = C_EMPTY;
     num_stones_removed++;
     // empty_list.add(cur);
@@ -1269,7 +1265,7 @@ Loc Board::addChainHelper(Loc head, Loc tailTarget, Loc loc, Player pla)
 {
   //Add stone here
   colors[loc] = pla;
-  // pos_hash ^= ZOBRIST_BOARD_HASH[loc][pla];
+  pos_hash ^= ZOBRIST_BOARD_HASH[loc][pla];
   chain_head[loc] = head;
   chain_data[head].num_locs++;
   next_in_chain[loc] = tailTarget;
@@ -2320,7 +2316,7 @@ void Board::checkConsistency() const {
       throw StringError(errLabel + "FindLiberties found a different number of libs");
   };
 
-  // Hash128 tmp_pos_hash = ZOBRIST_SIZE_X_HASH[x_size] ^ ZOBRIST_SIZE_Y_HASH[y_size];
+  Hash128 tmp_pos_hash = ZOBRIST_SIZE_X_HASH[x_size] ^ ZOBRIST_SIZE_Y_HASH[y_size];
   int emptyCount = 0;
   for(Loc loc = 0; loc < MAX_ARR_SIZE; loc++) {
     int x = Location::getX(loc,x_size);
@@ -2336,8 +2332,8 @@ void Board::checkConsistency() const {
         // if(empty_list.contains(loc))
         //   throw StringError(errLabel + "Empty list contains filled location");
 
-        // tmp_pos_hash ^= ZOBRIST_BOARD_HASH[loc][colors[loc]];
-        // tmp_pos_hash ^= ZOBRIST_BOARD_HASH[loc][C_EMPTY];
+        tmp_pos_hash ^= ZOBRIST_BOARD_HASH[loc][colors[loc]];
+        tmp_pos_hash ^= ZOBRIST_BOARD_HASH[loc][C_EMPTY];
       }
       else if(colors[loc] == C_EMPTY) {
         // if(!empty_list.contains(loc))
@@ -2349,8 +2345,8 @@ void Board::checkConsistency() const {
     }
   }
 
-  // if(pos_hash != tmp_pos_hash)
-  //   throw StringError(errLabel + "Pos hash does not match expected");
+  if(pos_hash != tmp_pos_hash)
+    throw StringError(errLabel + "Pos hash does not match expected");
 
   // if(empty_list.size_ != emptyCount)
   //   throw StringError(errLabel + "Empty list size is not the number of empty points");
@@ -2393,8 +2389,8 @@ bool Board::isEqualForTesting(const Board& other, bool checkNumCaptures, bool ch
     return false;
   if(checkNumCaptures && numWhiteCaptures != other.numWhiteCaptures)
     return false;
-  // if(pos_hash != other.pos_hash)
-  //   return false;
+  if(pos_hash != other.pos_hash)
+    return false;
   for(int i = 0; i<MAX_ARR_SIZE; i++) {
     if(colors[i] != other.colors[i])
       return false;
@@ -2621,7 +2617,7 @@ vector<Loc> Location::parseSequence(const string& str, const Board& board) {
 void Board::printBoard(ostream& out, const Board& board, Loc markLoc, const vector<Move>* hist) {
   if(hist != NULL)
     out << "MoveNum: " << hist->size() << " ";
-  // out << "HASH: " << board.pos_hash << "\n";
+  out << "HASH: " << board.pos_hash << "\n";
   bool showCoords = board.x_size <= 50 && board.y_size <= 50;
   if(showCoords) {
     const char* xChar = "ABCDEFGHJKLMNOPQRSTUVWXYZ";

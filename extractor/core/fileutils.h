@@ -1,11 +1,7 @@
-/*
- * Adapted from KataGo: https://github.com/lightvector/KataGo
- */
-
 #ifndef CORE_FILEUTILS_H_
 #define CORE_FILEUTILS_H_
 
-#include "global.h"
+#include "../core/global.h"
 
 namespace FileUtils {
   bool exists(const std::string& path);
@@ -26,13 +22,13 @@ namespace FileUtils {
 
   void loadFileIntoString(const std::string& filename, const std::string& expectedSha256, std::string& buf);
   void loadFileIntoString(const std::string& filename, const std::string& expectedSha256, std::string& buf, std::string* actualSha256Buf);
-  void uncompressAndLoadFileIntoString(const std::string& filename, const std::string& expectedSha256, std::string& buf);
-  void uncompressAndLoadFileIntoString(const std::string& filename, const std::string& expectedSha256, std::string& buf, std::string* actualSha256Buf);
+  // void uncompressAndLoadFileIntoString(const std::string& filename, const std::string& expectedSha256, std::string& buf);
+  // void uncompressAndLoadFileIntoString(const std::string& filename, const std::string& expectedSha256, std::string& buf, std::string* actualSha256Buf);
 
   bool isDirectory(const std::string& filename);
   bool tryRemoveFile(const std::string& filename);
 
-  // std::string weaklyCanonical(const std::string& path);
+  std::string weaklyCanonical(const std::string& path);
 
   bool tryRename(const std::string& src, const std::string& dst);
   void rename(const std::string& src, const std::string& dst);
