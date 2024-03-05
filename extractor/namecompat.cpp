@@ -35,22 +35,23 @@ int main(int argc, char* argv[]) {
 
     string line, sgfpath;
     if(std::getline(instream, line))
-    	outstream << line << "\n";
+        outstream << line << "\n";
 
     while(std::getline(instream, line)) {
-    	if(!std::getline(instream, sgfpath, ','))
-    		continue;
-    	std::unique_ptr<Sgf> sgf(Sgf::loadFile(sgfpath));
-    	string blackName = sgf->getPlayerNameCompat(P_BLACK);
-    	string whiteName = sgf->getPlayerNameCompat(P_WHITE);
-    	outstream << sgfpath << ',' << blackName << ',' << whiteName;
-    	auto lastComma = line.rfind(',');
-    	if(string::npos != lastComma)
-    		outstream << line.substr(lastComma);
-    	outstream << "\n";
+        string sgfpath = Global::trim(line.substr(0, line.find(',')));
+        if(sgfpath.empty())
+            continue;
+        std::unique_ptr<Sgf> sgf(Sgf::loadFile(sgfpath));
+        string blackName = sgf->getPlayerNameCompat(P_BLACK);
+        string whiteName = sgf->getPlayerNameCompat(P_WHITE);
+        outstream << sgfpath << ',' << blackName << ',' << whiteName;
+        auto lastComma = line.rfind(',');
+        if(string::npos != lastComma)
+            outstream << line.substr(lastComma);
+        outstream << "\n";
 
-    	printMessage(std::cout, "Processed " + sgfpath + "\n");
-    	updateProgressBar(instream.tellg(), totalsize);
+        printMessage(std::cout, "Processed " + sgfpath + "\n");
+        updateProgressBar(instream.tellg(), totalsize);
     }
 
     instream.close();

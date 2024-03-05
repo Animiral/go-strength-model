@@ -57,21 +57,12 @@ $ mkdir dataset
 $ extractor/extractor sgfs.tar.gz dataset csv/games.csv
 ```
 
-As an alternative, this project also offers a script that just builds the CSV file from all eligible SGFs in a given directory and subdirectories. See "Filtering Games (alternative)" section. The advantage of `extractor` is that it is fast and there is no need to extract a large dataset, including undesirable SGFs, to disk. Beyond that, `extractor` extracts everything using file names with characters `[a-zA-Z0-9_-]` only, for better compatibility even if the players' names include characters not allowed in the target filesystem.
+As an alternative, this project also offers a script that just builds the CSV file from all eligible SGFs in a given directory and subdirectories. See "Filtering Games (alternative)" section. The advantage of `extractor` is that it is fast and there is no need to extract a large dataset, including undesirable SGFs, to disk. Beyond that, `extractor` extracts everything using file names with characters `[a-zA-Z0-9_-. ]` only, for better compatibility even if the players' names include characters not allowed in the target filesystem. On top of that, it features hacks to properly read some broken player names from the OGS 2021 dataset specifically.
+The `namecompat` utility bundled in the `extractor` directory can perform just the name extraction with corrections as its own step.
 
 ## Judging Games
 
 In this optional step, we override the specified winner of each game in the list with whoever held the advantage at the end in the eyes of KataGo. The goal is to improve the quality of the training data. In reality, games are often won by the player in the worse position. This can happen if their time runs out, if they feel lost and resign, or especially among beginners, the game reaches the counting stage and is scored wrong by the players. By eliminating these factors, we concentrate on the effectiveness of the moves played.
-
-Note: If the dataset is large, it may be advisable to split it into chunks of a fixed number of lines. You can stop the evaluation process after each chunk and resume it at any time at the next chunk.
-
-```
-$ header=$(head -n 1 csv/games_7M.csv)
-$ tail -n +2 csv/games_7M.csv | split -l 100000 --additional-suffix=.csv - csv/games_7M.part.
-$ for file in csv/games_7M.part.*; do
-  sed -i "1i ${header}" "${file}"
-  done
-```
 
 The forked KataGo repository contains the script `judge_gameset.py`, which can read our prepared `games.csv` and output a new list with predicted winners.
 
@@ -86,6 +77,7 @@ $ python3 ~/source/katago/python/judge_gameset.py $FLAGS --katago-path $KATAGO -
 ```
 
 The script copies all columns from the input except for `Winner`. The new winner is noted in the `Score` column of the output file, with a value of `1` if black wins, `0` if white wins, and `0.5` if the game cannot be decided. Undecided games are omitted from the output unless you pass the flag `--keep-undecided` to the script. The depth of evaluation can be modified with the `--max-visits` argument, which passes through to KataGo.
+If the process of judging games should be interrupted, the script can resume from any point. If the output file exists prior to running, all SGF names in it are excluded from being run through KataGo and new results are appended to the file.
 
 ## Splitting the Dataset
 

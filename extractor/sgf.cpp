@@ -1204,8 +1204,21 @@ static string parseTextValue(const string& str, int& pos) {
   int newPos;
   while(true) {
     char c = peekSgfTextChar(str,pos,newPos);
-    if(!escaping && c == ']') {
-      break;
+    if(c == ']') {
+      if(escaping) {
+        // HACK to address unescaped backslashes!
+        // If it looks like the backslash should have been escaped, pretend that it was.
+        // e.g. "PB[blackPlayer\]PW[whitePlayer]"
+        string ahead = str.substr(newPos, 3);
+        if("PB[" == ahead || "PW[" == ahead || "BR[" == ahead || "WR[" == ahead) {
+          escaping = false;
+          acc += '\\';
+          break;
+        }
+      }
+      else {
+        break;
+      }
     }
     consume(str,pos,newPos);
 
