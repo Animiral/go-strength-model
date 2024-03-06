@@ -157,6 +157,8 @@ bool isSgfEligible(const string& content, const string& basedir, CsvLine& csvLin
     };
 
     // FILTER: proper komi
+    if(!sgf->nodes[0]->hasProperty("KM"))
+        return false; // override sgf->getKomi() default because we do require Komi specification
     float komi = sgf->getKomi();
     if(!contains({6.f, 6.5f, 7.f, 7.5f}, komi))
         return false;
