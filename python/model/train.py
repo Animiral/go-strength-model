@@ -2,7 +2,7 @@ import argparse
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset, DataLoader
 
 device = "cuda"
 training_data = [torch.rand((5, 10, 3))]
@@ -23,10 +23,10 @@ class StrengthNet(nn.Module):
 
     def forward(self, x):
         h = self.layer1(x)
-        r = self.rating(h)
-        z = self.weights(h)
-        w = F.softmax(z)
-        return sum(r * w)
+        r = self.rating(h).squeeze(-1)
+        z = self.weights(h).squeeze(-1)
+        w = F.softmax(z, dim=1)
+        return torch.sum(r * w, dim=1)
 
 def main(args):
     listfile = args["listfile"]
@@ -39,7 +39,7 @@ def main(args):
     print(f"Device: {device}")
 
     model = StrengthNet().to(device)
-    print(f"Model parameters: {model.parameters()}")
+    print(f"Model parameters: {list(model.parameters())}")
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
     epochs = 5
@@ -52,11 +52,12 @@ def main(args):
 def train(data, model, optimizer):
     size = len(data)
     model.train()
+    MSE = nn.MSELoss()
 
     for batch, (X, y) in enumerate(data):
         X, y = X.to(device), y.to(device)
         pred = model(X)
-        loss = nn.MSELoss(pred, y)
+        loss = MSE(pred, y)
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
@@ -67,12 +68,14 @@ def train(data, model, optimizer):
 def test(data, model):
     size = len(data)
     model.eval()
+    MSE = nn.MSELoss()
+
     test_loss, correct = 0, 0
     with torch.no_grad():
         for X, y in data:
             X, y = X.to(device), y.to(device)
             pred = model(X)
-            test_loss += nn.MSELoss(pred, y).item()
+            test_loss += MSE(pred, y).item()
     test_loss /= size
     print(f"Test Error: \n Avg loss: {test_loss:>8f} \n")
 
