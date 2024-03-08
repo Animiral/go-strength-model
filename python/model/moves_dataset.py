@@ -5,6 +5,7 @@ from typing import List, Optional
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
+from torch.nn.utils.rnn import pad_sequence
 
 class PlayerGameEntry:
     """Represents the data for one of the players in a game"""
@@ -59,7 +60,7 @@ class MovesDataset(Dataset):
             self._fillRecentMoves(game.black.name, game)
         if game.white.recentMoves is None:
             self._fillRecentMoves(game.white.name, game)
-        return game
+        return (game.black.recentMoves, game.white.recentMoves, game.black.rating, game.white.rating, game.score)
 
     @staticmethod
     def _getScore(row):
@@ -121,10 +122,10 @@ class MovesDataset(Dataset):
             features_flat = np.fromfile(file, dtype=np.dtype(np.float32))
 
         count = len(features_flat) // MovesDataset.featureDims
-        return torch.from_numpy(features_flat.reshape((MovesDataset.featureDims, count)))
+        return torch.from_numpy(features_flat).reshape(MovesDataset.featureDims, count)
 
     def _fillRecentMoves(self, player: str, game: GameEntry, window: int = 1000):
-        recentMoves = torch.Tensor()
+        recentMoves = torch.empty(MovesDataset.featureDims, 0)
         count = 0
         gamePlayerEntry = game.playerEntry(player)
         historic = gamePlayerEntry.prevGame
@@ -147,9 +148,18 @@ class MovesDataset(Dataset):
 
         gamePlayerEntry.recentMoves = recentMoves
 
-def collate_fn(batch):
-    # padding?
-    return batch
+def pad_collate(batch):
+    brecent, wrecent, brating, wrating, score = zip(*batch)
+    blens = [r.shape[1] for r in brecent]
+    wlens = [r.shape[1] for r in wrecent]
+    brecent, wrecent = torch.cat(brecent, dim=1), torch.cat(wrecent, dim=1)
+    brating, wrating, score = map(torch.Tensor, (brating, wrating, score))
+    return brecent, wrecent, blens, wlens, brating, wrating, score
+
+class MovesDataLoader(DataLoader):
+    def __init__(self, *args, **kwargs):
+        kwargs['collate_fn'] = pad_collate
+        super().__init__(*args, **kwargs)
 
 if __name__ == "__main__":
     print("Test moves_dataset.py")
@@ -159,11 +169,7 @@ if __name__ == "__main__":
     dataset = MovesDataset(listpath, featuredir, marker)
     print(f"Loaded {len(dataset.games)} games, {len(dataset)} of type {marker}.")
 
-    loader = DataLoader(dataset, batch_size=1, collate_fn=collate_fn)
-    # loader = DataLoader(dataset, batch_size=32, collate_fn=collate_fn)
+    loader = DataLoader(dataset, batch_size=3, collate_fn=pad_collate)
 
-    for game in loader:
-        g = game[0]
-        brecent = g.black.recentMoves.shape[1] if g.black.recentMoves.nelement() > 0 else 0
-        wrecent = g.white.recentMoves.shape[1] if g.white.recentMoves.nelement() > 0 else 0
-        print(f"{g.black.name} vs {g.white.name}: {brecent}/{wrecent} recent moves.")
+    for bx, wx, blens, wlens, by, wy, score in loader:
+        print(f"Got batch size bx: {bx.shape} ({blens}), wx: {wx.shape} ({wlens}); {by}; {wy}; {score}.")
