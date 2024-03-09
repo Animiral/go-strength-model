@@ -119,13 +119,13 @@ class MovesDataset(Dataset):
             if header.size == 0 or header[0] != FEATURE_HEADER:
                 raise IOError("Failed to read from feature file " + path)
 
-            features_flat = np.fromfile(file, dtype=np.dtype(np.float32))
+            features_flat = np.fromfile(file, dtype=np.float32)
 
         count = len(features_flat) // MovesDataset.featureDims
-        return torch.from_numpy(features_flat).reshape(MovesDataset.featureDims, count)
+        return torch.from_numpy(features_flat).reshape(count, MovesDataset.featureDims)
 
     def _fillRecentMoves(self, player: str, game: GameEntry, window: int = 1000):
-        recentMoves = torch.empty(MovesDataset.featureDims, 0)
+        recentMoves = torch.empty(0, MovesDataset.featureDims)
         count = 0
         gamePlayerEntry = game.playerEntry(player)
         historic = gamePlayerEntry.prevGame
@@ -137,12 +137,12 @@ class MovesDataset(Dataset):
                 color = 'Black' if historic.black.name == player else 'White'
                 featurepath = f"{self.featuredir}/{sgfPathWithoutExt}_{color}Features.bin"
                 entry.features = MovesDataset._readFeaturesFromFile(featurepath);
-                recentMoves = torch.cat((entry.features, recentMoves), dim=1)
-                count += entry.features.shape[1]
+                recentMoves = torch.cat((entry.features, recentMoves), dim=0)
+                count += entry.features.shape[0]
 
             # trim to window size if necessary
             if count > window:
-                recentMoves = recentMoves[slice(None), slice(-window, None)]
+                recentMoves = recentMoves[slice(-window, None), slice(None)]
 
             historic = entry.prevGame
 
@@ -150,9 +150,9 @@ class MovesDataset(Dataset):
 
 def pad_collate(batch):
     brecent, wrecent, brating, wrating, score = zip(*batch)
-    blens = [r.shape[1] for r in brecent]
-    wlens = [r.shape[1] for r in wrecent]
-    brecent, wrecent = torch.cat(brecent, dim=1), torch.cat(wrecent, dim=1)
+    blens = [r.shape[0] for r in brecent]
+    wlens = [r.shape[0] for r in wrecent]
+    brecent, wrecent = torch.cat(brecent, dim=0), torch.cat(wrecent, dim=0)
     brating, wrating, score = map(torch.Tensor, (brating, wrating, score))
     return brecent, wrecent, blens, wlens, brating, wrating, score
 

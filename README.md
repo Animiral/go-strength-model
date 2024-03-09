@@ -79,6 +79,8 @@ $ python3 ~/source/katago/python/judge_gameset.py $FLAGS --katago-path $KATAGO -
 The script copies all columns from the input except for `Winner`. The new winner is noted in the `Score` column of the output file, with a value of `1` if black wins, `0` if white wins, and `0.5` if the game cannot be decided. Undecided games are omitted from the output unless you pass the flag `--keep-undecided` to the script. The depth of evaluation can be modified with the `--max-visits` argument, which passes through to KataGo.
 If the process of judging games should be interrupted, the script can resume from any point. If the output file exists prior to running, all SGF names in it are excluded from being run through KataGo and new results are appended to the file.
 
+For a dataset of 7M+ games, even with an optimized KataGo build with TensorRT backend, using a `b18c384nbt` network and `--max-visits 10`, running on an RTX 4070 GPU, this can take over 40 hours total to run.
+
 ## Splitting the Dataset
 
 The script `random_split.py` reads a CSV file and adds or modifies the "Set" column, which marks each row as a member in one of three sets: "T" for the *training set*, "V" for the *validation set* and "E" for the *test set*. The markers are distributed randomly with prevalence according to user-defined "fraction" parameters.
