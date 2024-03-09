@@ -1,5 +1,6 @@
 # Outputs of scripts, things specific to this repository
 dataset/
+nets/
 player/
 featurecache/
 datasetviewer/
