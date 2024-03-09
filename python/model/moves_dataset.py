@@ -62,6 +62,27 @@ class MovesDataset(Dataset):
             self._fillRecentMoves(game.white.name, game)
         return (game.black.recentMoves, game.white.recentMoves, game.black.rating, game.white.rating, game.score)
 
+    def write(self, outpath: str):
+        """Write to CSV file including predictions data where applicable"""
+        with open(outpath, 'w') as outfile:
+            fieldnames = ['File','Player White','Player Black','Score','BlackRating','WhiteRating','PredictedScore','PredictedBlackRating','PredictedWhiteRating','Set']
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for game in self.marked:
+                row = {
+                    'File': game.sgfPath,
+                    'Player White': game.white.name,
+                    'Player Black': game.black.name,
+                    'Score': game.score,
+                    'BlackRating': game.black.rating,
+                    'WhiteRating': game.white.rating,
+                    'PredictedScore': game.predictedScore,
+                    'PredictedBlackRating': game.black.predictedRating,
+                    'PredictedWhiteRating': game.white.predictedRating,
+                    'Set': game.marker
+                }
+                writer.writerow(row)
+
     @staticmethod
     def _getScore(row):
         if "Score" in row.keys():
