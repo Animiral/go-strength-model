@@ -1,7 +1,7 @@
 """
 Given an input file listing Go matches, split them into a training set,
 a validation set and a test set.
-The split fractions can be provided as arguments.
+The split amounts can be provided as arguments.
 Output the evaluation results to a new file or the same file with the assignment in the 'Set' column:
   - 'T' for training games
   - 'V' for validation games
@@ -36,16 +36,23 @@ if __name__ == "__main__":
         help="Path to the resulting CSV file with set markers.",
     )
     parser.add_argument(
-        "-t", "--trainingFraction",
+        "-t", "--trainingPart",
         default="0.8",
-        type=lambda x: float(x) if 0.0 <= float(x) <= 1.0 else argparse.ArgumentTypeError(f"trainingFraction must be between 0 and 1"),
-        help="Fraction of total records which should be given the test set marker",
+        type=float,
+        help="Part of total records which should be given the training set marker",
     )
     parser.add_argument(
-        "-v", "--validationFraction",
+        "-v", "--validationPart",
         default="0.1",
-        type=lambda x: float(x) if 0.0 <= float(x) <= 1.0 else argparse.ArgumentTypeError(f"validationFraction must be between 0 and 1"),
-        help="Fraction of total records which should be given the validation set marker",
+        type=float,
+        help="Part of total records which should be given the validation set marker",
+    )
+    parser.add_argument(
+        "-e", "--testPart",
+        default=None,
+        type=float,
+        help="Part of total records which should be given the test set marker",
+        required=False
     )
     args = parser.parse_args()
     print(vars(args))
@@ -70,16 +77,23 @@ if __name__ == "__main__":
         for r in rows:
             r["Set"] = markerlookup[r["File"]]
     else:
-        trainingFraction = args.trainingFraction
-        validationFraction = args.validationFraction
+        trainingPart = args.trainingPart
+        validationPart = args.validationPart
         rowCount = len(rows)
-        trainCount = round(rowCount * trainingFraction)
-        validationCount = round(rowCount * validationFraction)
-        testCount = rowCount - trainCount - validationCount
+        trainCount = int(round(rowCount * args.trainingPart) if args.trainingPart < 1 else args.trainingPart)
+        validationCount = int(round(rowCount * args.validationPart) if args.validationPart < 1 else args.validationPart)
+        if args.testPart is None:
+            testCount = rowCount - trainCount - validationCount
+        else:
+            testCount = int(round(rowCount * args.testPart) if args.testPart < 1 else args.testPart)
+        remainder = rowCount - trainCount - validationCount - testCount
+        if remainder < 0:
+            print(f"Not enough rows to mark them! T={trainCount}, V={validationCount}, E={testCount}, rows={rowCount}")
+            exit()
 
-        print(f"Randomly splitting {len(rows)} rows {trainingFraction}/{validationFraction}/...: {trainCount} training, {validationCount} validation, {testCount} testing.")
+        print(f"Randomly splitting {len(rows)} rows {trainingPart}/{validationPart}/...: {trainCount} training, {validationCount} validation, {testCount} testing.")
 
-        markers = list('T'*trainCount + 'V'*validationCount + 'E'*testCount)
+        markers = list('T'*trainCount + 'V'*validationCount + 'E'*testCount + '-'*remainder)
         random.shuffle(markers)
 
         for r, m in zip(rows, markers):

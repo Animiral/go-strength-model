@@ -83,17 +83,17 @@ For a dataset of 7M+ games, even with an optimized KataGo build with TensorRT ba
 
 ## Splitting the Dataset
 
-The script `random_split.py` reads a CSV file and adds or modifies the "Set" column, which marks each row as a member in one of three sets: "T" for the *training set*, "V" for the *validation set* and "E" for the *test set*. The markers are distributed randomly with prevalence according to user-defined "fraction" parameters.
+The script `random_split.py` reads a CSV file and adds or modifies the "Set" column, which marks a number of rows as a member in one of three sets: "T" for the *training set*, "V" for the *validation set* and "E" for the *test set*. Rows not in any set are marked with "-". The markers are distributed randomly, either as a proportion relative to the whole dataset if the user-defined "part" parameters are <1, or to an absolute number of rows given in the parameters if they are >=1.
 
 The motivation behind assigning rows to sets instead of splitting the entire match pool is that if we just form distinct pools from the original one, we tear apart player's rating histories, depriving our algorithms of the data from which they derive their predictions. Instead, we keep them in the same pool. In the training process, we train only on training matches and test only on test matches, while the combined match data is available in the rating history. This technique stems from link prediction problems in social networks, where random test edges are removed from the full graph and later predicted by the model trained on the remaining edges.
 
 Run the set assignment script as follows.
 
 ```
-$ python3 python/random_split.py --input csv/games_judged.csv --output csv/games_judged.csv --trainingFraction 0.8 --validationFraction 0.1
+$ python3 python/random_split.py --input csv/games_judged.csv --output csv/games_judged.csv --trainingPart 0.8 --validationPart 0.1
 ```
 
-This will allocate 80% of all rows to the training set, 10% to the validation set and the remaining 10% to the test set.
+This will allocate 80% of all rows to the training set, 10% to the validation set and the remaining 10% to the test set. When specifying absolute numbers or to leave some rows unassigned, use the `--testPart` parameter as well.
 
 Once allocated, the script can also copy the same set markers to a different CSV file, as long as the "copy-from" file has both "File" and "Set" headers and holds the information on every "File" listed in the input CSV file:
 
