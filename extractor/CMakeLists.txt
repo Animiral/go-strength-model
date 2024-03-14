@@ -19,6 +19,18 @@ add_executable(extractor extractor.cpp
 	core/fileutils.cpp      core/rand.cpp
 	game/board.cpp  game/boardhistory.cpp  game/graphhash.cpp  game/rules.cpp)
 
+add_executable(sgffilter sgffilter.cpp
+	sgf.cpp
+	core/base64.cpp         core/global.cpp       core/rand_helpers.cpp
+	core/bsearch.cpp        core/hash.cpp         core/sha2.cpp
+	core/commandloop.cpp    core/logger.cpp       core/test.cpp
+	core/config_parser.cpp  core/mainargs.cpp     core/threadsafecounter.cpp
+	core/datetime.cpp       core/threadsafequeue.cpp
+	core/elo.cpp            core/md5.cpp          core/threadtest.cpp
+	core/fancymath.cpp      core/multithread.cpp  core/timer.cpp
+	core/fileutils.cpp      core/rand.cpp
+	game/board.cpp  game/boardhistory.cpp  game/graphhash.cpp  game/rules.cpp)
+
 add_executable(namecompat namecompat.cpp
 	sgf.cpp
 	core/base64.cpp         core/global.cpp       core/rand_helpers.cpp

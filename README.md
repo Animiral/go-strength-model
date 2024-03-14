@@ -39,7 +39,7 @@ We start by preparing the games which we want to use in training. We assume that
 
 ## Filtering Games
 
-The `extractor` program provided in this repository searches through an archive of SGF files for suitable training games. Every eligible file is extracted to the dataset directory to a file path constructed from the game date specified in the SGF and the names of the players. Additionally, all SGF paths are printed to a CSV output file. Suitable games are no-handicap even 19x19 games with more than 5 seconds per move to think, have at least 20 moves played, were decided by either counting, resignation or timeout, and contain the string "ranked" (and not "unranked") in the GC property.
+The `extractor` program provided in this repository searches through an archive of SGF files for suitable training games. Every eligible file is extracted to the dataset directory to a file path constructed from the game date specified in the SGF and the names of the players. Additionally, all SGF paths are printed to a CSV output file. Suitable games are no-handicap even 19x19 games with more than 5 seconds per move to think, have at least 20 moves played, no passes before move 50, were decided by either counting, resignation or timeout, and contain the string "ranked" (and not "unranked") in the GC property.
 
 The `extractor` must be compiled from its C++ sources, located in this repository in the `extractor` subdirectory.
 
@@ -57,7 +57,7 @@ $ mkdir dataset
 $ extractor/extractor sgfs.tar.gz dataset csv/games.csv
 ```
 
-As an alternative, this project also offers a script that just builds the CSV file from all eligible SGFs in a given directory and subdirectories. See "Filtering Games (alternative)" section. The advantage of `extractor` is that it is fast and there is no need to extract a large dataset, including undesirable SGFs, to disk. Beyond that, `extractor` extracts everything using file names with characters `[a-zA-Z0-9_-. ]` only, for better compatibility even if the players' names include characters not allowed in the target filesystem. On top of that, it features hacks to properly read some broken player names from the OGS 2021 dataset specifically.
+As an alternative, this project also offers a script that just builds the CSV file from all eligible SGFs in a given directory and subdirectories, and another utility to filter a game list in CSV format. See "Filtering Games (alternative)" section. The advantage of `extractor` is that it is fast and there is no need to extract a large dataset, including undesirable SGFs, to disk. Beyond that, `extractor` extracts everything using file names with characters `[a-zA-Z0-9_-. ]` only, for better compatibility even if the players' names include characters not allowed in the target filesystem. On top of that, it features hacks to properly read some broken player names from the OGS 2021 dataset specifically.
 The `namecompat` utility bundled in the `extractor` directory can perform just the name extraction with corrections as its own step.
 
 ## Judging Games
@@ -119,6 +119,18 @@ $ python3 python/name_ratings.py --list csv/games_judged.csv --ratings csv/games
 ```
 
 This step is “dataset preparation” in the sense that we may train our model on future Glicko ratings, see Training section below. Otherwise, Glicko-2 is a reference rating system for us.
+
+## Recent Moves Precomputation
+
+This script precomputes, for every game in the dataset, for both the black and white side, which games contain their "recent moves". These are the moves that the strength model may use to predict the outcome of that game. We want to use the training, validation and test sets, so we have to run the script for each of them.
+
+```
+$ LISTFILE=csv/games_judged.csv
+$ FEATUREDIR=path/to/featurecache
+$ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker T
+$ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker V
+$ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker E
+```
 
 ## Move Feature Precomputation
 
@@ -195,15 +207,15 @@ The strength model is implemented as a modification to KataGo, the C++ program. 
 
 One way to train our strength model is to let it predict the players' future rating number. The `label_gameset.py` script provided in this repository reads the list of games that we produced in the previous steps. The output games list contains the future rating of both the black and the white player involved, from the point when they have played an additional number of games as specified in the `--advance` argument.
 
-For example, if Alice starts with a rating of 1000 and then plays against B, C, D, E and F, resulting in ratings of 1100, 1200, 1300, 1400 and 1500 respectively, and the `--advance` option is set to 3 (games in the future), then the resultant labeling might be:
+For example, if Alice starts with a rating of 1000 and then wins against B, C, D, E and F, resulting in ratings of 1100, 1200, 1300, 1400 and 1500 respectively, and the `--advance` option is set to 3 (games in the future), then the resultant labeling might be:
 
 ```
-File,Player White,Player Black,Winner,Label White,Label Black
-Alice_vs_B.sgf,Alice,B,W+,1300,1000
-Alice_vs_C.sgf,Alice,C,W+,1400,1000
-Alice_vs_D.sgf,Alice,D,W+,1500,1000
-Alice_vs_E.sgf,Alice,E,W+,1500,1000
-Alice_vs_F.sgf,Alice,F,W+,1500,1000
+File,Player White,Player Black,Score,WhiteRating,BlackRating
+Alice_vs_B.sgf,Alice,B,0,1300,1000
+Alice_vs_C.sgf,Alice,C,0,1400,1000
+Alice_vs_D.sgf,Alice,D,0,1500,1000
+E_vs_Alice.sgf,E,Alice,1,1000,1500
+Alice_vs_F.sgf,Alice,F,0,1500,1000
 ```
 
 Run the script as follows.
@@ -304,4 +316,14 @@ The `sgffilter.py` script provided in this repository traverses a given director
 
 ```
 $ python3 python/sgffilter.py path/to/dataset more/paths/to/datasets --output csv/games.csv
+```
+
+Another alternative is the C++ utility `sgffilter` in the `extractor` directory. It takes an input CSV list of games like `games.csv` and writes to an output CSV list all those games which meet even stricter filter criteria: games with passes or nowhere-moves before move 50 are discarded.
+
+```
+$ pushd extractor
+$ cmake .
+$ make
+$ popd
+$ extractor/sgffilter csv/games.csv csv/games_refiltered.csv
 ```

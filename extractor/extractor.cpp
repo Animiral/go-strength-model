@@ -194,7 +194,7 @@ bool isSgfEligible(const string& content, const string& basedir, CsvLine& csvLin
         return false;
     }
 
-    // FILTER: all moves in the game must be legal moves
+    // FILTER: all moves in the game must be legal moves, no passes up to move 50
     {
         Rules rules = csgf->getRulesOrFailAllowUnspecified(Rules::getTrompTaylorish());
         Board board;
@@ -204,6 +204,8 @@ bool isSgfEligible(const string& content, const string& basedir, CsvLine& csvLin
 
         for(int turnIdx = 0; turnIdx < csgf->moves.size(); turnIdx++) {
             Move move = csgf->moves[turnIdx];
+            if(turnIdx < 50 && (Board::PASS_LOC == move.loc || Board::NULL_LOC == move.loc))
+                return false;
             if(!history.makeBoardMoveTolerant(board, move.loc, move.pla))
               return false; // illegal move detected
         }
