@@ -1,6 +1,8 @@
 from __future__ import annotations
 import os
+from os.path import exists
 import csv
+import re
 from typing import List, Optional
 import numpy as np
 import torch
@@ -82,6 +84,13 @@ class MovesDataset(Dataset):
                     'Set': game.marker
                 }
                 writer.writerow(row)
+
+    def writeRecentMoves(self):
+        """Write to CSV files in the feature directory all the recent move specifications"""
+        for game in self.marked:
+            print(game.sgfPath)
+            self._writeRecentMovesIfNotExists(game.black.name, game)
+            self._writeRecentMovesIfNotExists(game.white.name, game)
 
     @staticmethod
     def _getScore(row):
@@ -168,6 +177,65 @@ class MovesDataset(Dataset):
             historic = entry.prevGame
 
         gamePlayerEntry.recentMoves = recentMoves
+
+    @staticmethod
+    def _countGameMoves(path: str):
+        # We don't want to spend the time and really parse the SGF here, so let's do crude main-variation parsing.
+        # From the first move indicated by "B[", the main variation always comes first.
+        # Alternative variations may be present after a close paren to the main variation, so stop at that.
+        with open(path, 'r', encoding='utf-8') as file:
+            contents = file.read()
+
+        count = 0
+        bpattern, wpattern = re.compile(r'\WB\[\w'), re.compile(r'\WW\[\w')
+        black_next = True
+        match = bpattern.search(contents)
+        if not match:
+            import pdb; pdb.set_trace()
+        limit = contents.find(')', match.end())
+        contents = contents[:limit] if limit >= 0 else contents
+
+        while match:
+            count += 1
+            contents = contents[match.end():]
+            black_next = not black_next
+            pattern = bpattern if black_next else wpattern
+            match = pattern.search(contents)
+
+        return count
+
+    def _writeRecentMovesIfNotExists(self, player: str, game: GameEntry, window: int = 1000):
+        recentMoves = torch.empty(0, MovesDataset.featureDims)
+        count = 0
+        gamePlayerEntry = game.playerEntry(player)
+        historic = gamePlayerEntry.prevGame
+
+        color = 'Black' if game.black.name == player else 'White'
+        sgfPathWithoutExt, _ = os.path.splitext(game.sgfPath)
+        recentpath = f"{self.featuredir}/{sgfPathWithoutExt}_{color}RecentMoves.csv"
+
+        if exists(recentpath):
+            return  # this allows us to resume previously interrupted recent moves extraction
+
+        os.makedirs(os.path.dirname(recentpath), exist_ok=True) # ensure dir exists
+
+        with open(recentpath, 'w') as recentfile:
+            writer = csv.DictWriter(recentfile, fieldnames=['File','StartMove','Count'])
+            writer.writeheader()
+            while count < window and historic is not None:
+                entry = historic.playerEntry(player)
+                color = 'Black' if historic.black.name == player else 'White'
+                gamemoves = MovesDataset._countGameMoves(historic.sgfPath)
+                base = 0 if 'Black' == color else 1
+                mymoves = range(base, gamemoves, 2)
+                newcount = count + len(mymoves)
+                overshoot = max(0, newcount - window)
+                count = min(newcount, window)
+                if overshoot < 0 or overshoot >= len(mymoves):
+                    import pdb; pdb.set_trace()
+                startmove = mymoves[overshoot]
+                writer.writerow({'File': historic.sgfPath, 'StartMove': startmove, 'Count': len(mymoves)-overshoot})
+                historic = entry.prevGame
 
 def pad_collate(batch):
     brecent, wrecent, brating, wrating, score = zip(*batch)
