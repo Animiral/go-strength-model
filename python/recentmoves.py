@@ -1,24 +1,53 @@
-# Determine the recent move set for all the marked games in a list file and write them to the feature dir
+# Print contents of a recent move .npz
 import argparse
 import os
-import csv
-from model.moves_dataset import MovesDataset
+import numpy as np
+import torch
+
+
+def print_tensor_board(black_stones, white_stones, last_move, next_move):
+    def get_piece(x,y):
+        if next_move[x,y] > 0:
+            return 'A '
+        elif black_stones[x,y] > 0:
+            if last_move[x,y] > 0:
+                return 'X '
+            else:
+                return 'x '
+        elif white_stones[x,y] > 0:
+            if last_move[x,y] > 0:
+                return 'O '
+            else:
+                return 'o '
+        elif (x == 3 or x == 19/2 or x == 19-1-3) and (y == 3 or y == 19/2 or y == 19-1-3):
+            return '* '
+        else:
+            return '. '
+
+    print("\n".join("".join(get_piece(x,y) for x in range(19)) for y in range(19)), "\n")
 
 def main(args):
-    listfile = args["listfile"]
-    featuredir = args["featuredir"]
-    marker = args["marker"]
+    recentfile = args["recentfile"]
+    print(f"Load recent move data from {recentfile}")
+    with np.load(recentfile) as npz:
+        binaryInputNCHW = npz["binaryInputNCHW"]
+        locInputNCHW = npz["locInputNCHW"]
+        globalInputNC = npz["globalInputNC"]
+    del npz
 
-    print(f"Load games data from {listfile}, type {marker}")
-    print(f"Store recent moves specs in {featuredir}")
+    binaryInputNCHW = torch.from_numpy(binaryInputNCHW) #.to(device)
+    locInputNCHW = torch.from_numpy(locInputNCHW) #.to(device)
+    globalInputNC = torch.from_numpy(globalInputNC) #.to(device)
 
-    dataset = MovesDataset(listfile, featuredir, marker)
-    print(f"Loaded {len(dataset.games)} games, {len(dataset)} of type {marker}.")
-    dataset.writeRecentMoves()
+    for b, l, g in zip(binaryInputNCHW, locInputNCHW, globalInputNC):
+        print_tensor_board(b[1,:,:], b[2,:,:], b[9,:,:], l[0])
+        # print(f"binaryInputNCHW shape: {b.shape}")
+        # print(f"locInputNCHW shape: {l.shape}")
+        # print(f"globalInputNC shape: {g.shape}")
 
 if __name__ == "__main__":
     description = """
-    Extract recent moves for every marked game from dataset.
+    Print contents of a recent move .npz for debugging.
     """
 
     parser = argparse.ArgumentParser(description=description,add_help=False)
@@ -31,9 +60,7 @@ if __name__ == "__main__":
         default=argparse.SUPPRESS,
         help='show this help message and exit'
     )
-    required_args.add_argument('listfile', help='CSV file listing games and labels')
-    required_args.add_argument('featuredir', help='directory containing extracted recent move lists')
-    optional_args.add_argument('-m', '--marker', help='set marker of games to select', type=str, default='T', required=False)
+    required_args.add_argument('recentfile', help='npz file containing an input tensor of recent moves')
 
     args = vars(parser.parse_args())
     main(args)

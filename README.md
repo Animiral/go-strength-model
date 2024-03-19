@@ -120,26 +120,18 @@ $ python3 python/name_ratings.py --list csv/games_judged.csv --ratings csv/games
 
 This step is “dataset preparation” in the sense that we may train our model on future Glicko ratings, see Training section below. Otherwise, Glicko-2 is a reference rating system for us.
 
-## Recent Moves Precomputation
+## Input Tensor Precomputation
 
-This script precomputes, for every game in the dataset, for both the black and white side, which games contain their "recent moves". These are the moves that the strength model may use to predict the outcome of that game. We want to use the training, validation and test sets, so we have to run the script for each of them.
+The strength prediction for a player is based on a large number of *recent moves*, every one of which must be evaluated by the KataGo network to find its embedding.
+Even before we pass the corresponding board positions to the KataGo network, they have to be converted into input tensors with features such as “moving here captures the opponent in a ladder”. We precompute this expensive conversion with a new KataGo command implemented in my fork (linked at the top). Launch the command to generate an `.npz` (numpy archive) containing the recent move input tensors for every marked game (training, validation or test) in a list file as follows:
 
 ```
-$ LISTFILE=csv/games_judged.csv
+$ KATAGO=path/to/katago
+$ CONFIG=path/to/configs/analysis_example.cfg
+$ LIST=csv/games_labels.csv
 $ FEATUREDIR=path/to/featurecache
-$ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker T
-$ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker V
-$ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker E
-```
-
-## Move Feature Precomputation
-
-Move features are the outputs of the KataGo network and inputs to the strength model. Since the KataGo network is static for us, while the strength model is trained, it saves time to do this expensive precomputation just once. Launch the command to precompute all features for every game in a list file and write them to feature files in a dedicated directory as follows:
-
-```
-$ KATA_MODEL=path/to/model.bin.gz
-$ FEATUREDIR=path/to/featurecache
-$ katago extract_features -model $KATA_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
+$ WINDOWSIZE=1000
+$ katago extract_features config $CONFIG -list $LIST -featuredir $FEATUREDIR -window-size $WINDOWSIZE
 ```
 
 # Dataset Viewer
@@ -326,4 +318,26 @@ $ cmake .
 $ make
 $ popd
 $ extractor/sgffilter csv/games.csv csv/games_refiltered.csv
+```
+
+## Recent Moves Precomputation
+
+This script precomputes, for every game in the dataset, for both the black and white side, which games contain their "recent moves". These are the moves that the strength model may use to predict the outcome of that game. We want to use the training, validation and test sets, so we have to run the script for each of them.
+
+```
+$ LISTFILE=csv/games_judged.csv
+$ FEATUREDIR=path/to/featurecache
+$ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker T
+$ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker V
+$ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker E
+```
+
+## Move Feature Precomputation for Proof of Concept Model
+
+This smaller strength model uses just six features for each move computed from the outputs of the KataGo search engine. These are winrate after move, points lead after move, move policy, max policy on board, winrate loss and points loss. Here the KataGo network is static for us, so it saves time to do this expensive precomputation just once before training the strength model. Launch the command to precompute all features for every game in a list file and write them to feature files in a dedicated directory as follows:
+
+```
+$ KATA_MODEL=path/to/model.bin.gz
+$ FEATUREDIR=path/to/featurecache
+$ katago extract_pocfeatures -model $KATA_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
 ```
