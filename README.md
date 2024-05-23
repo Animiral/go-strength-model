@@ -90,10 +90,18 @@ The motivation behind assigning rows to sets instead of splitting the entire mat
 Run the set assignment script as follows.
 
 ```
+$ python3 python/random_split.py --input csv/games_judged.csv --output csv/games_judged.csv --trainingPart 10000 --validationPart 5000 --testPart 5000
+```
+
+This will allocate 10000 rows to the training set, 5000 to the validation set and 5000 to the test set. Any remaining rows are left unassigned, but still part of the dataset, forming the players' histories and acting as a source of recent moves. Just the model will not be trained or tested on these data points. Because all games with a set marker (more specifically, their recent move sets) must be preprocessed through the KataGo network, it is not feasible to mark millions of games for training.
+
+As an alternative usage, the splits can be specified as fractions. Omitting `--testPart` assigns all remaining rows to the test set.
+
+```
 $ python3 python/random_split.py --input csv/games_judged.csv --output csv/games_judged.csv --trainingPart 0.8 --validationPart 0.1
 ```
 
-This will allocate 80% of all rows to the training set, 10% to the validation set and the remaining 10% to the test set. When specifying absolute numbers or to leave some rows unassigned, use the `--testPart` parameter as well.
+This will allocate 80% of all rows to the training set, 10% to the validation set and the remaining 10% to the test set.
 
 Once allocated, the script can also copy the same set markers to a different CSV file, as long as the "copy-from" file has both "File" and "Set" headers and holds the information on every "File" listed in the input CSV file:
 
@@ -119,20 +127,6 @@ $ python3 python/name_ratings.py --list csv/games_judged.csv --ratings csv/games
 ```
 
 This step is “dataset preparation” in the sense that we may train our model on future Glicko ratings, see Training section below. Otherwise, Glicko-2 is a reference rating system for us.
-
-## Input Tensor Precomputation
-
-The strength prediction for a player is based on a large number of *recent moves*, every one of which must be evaluated by the KataGo network to find its embedding.
-Even before we pass the corresponding board positions to the KataGo network, they have to be converted into input tensors with features such as “moving here captures the opponent in a ladder”. We precompute this expensive conversion with a new KataGo command implemented in my fork (linked at the top). Launch the command to generate an `.npz` (numpy archive) containing the recent move input tensors for every marked game (training, validation or test) in a list file as follows:
-
-```
-$ KATAGO=path/to/katago
-$ CONFIG=path/to/configs/analysis_example.cfg
-$ LIST=csv/games_labels.csv
-$ FEATUREDIR=path/to/featurecache
-$ WINDOWSIZE=1000
-$ katago extract_features config $CONFIG -list $LIST -featuredir $FEATUREDIR -window-size $WINDOWSIZE
-```
 
 # Dataset Viewer
 
@@ -215,6 +209,27 @@ Run the script as follows.
 ```
 $ python3 python/label_gameset.py --list csv/games_glicko.csv --output csv/games_labels.csv --advance 10
 ```
+
+## Precomputation
+
+The strength prediction for a player is based on a large number of *recent moves*, every one of which must be evaluated by the KataGo network to find its embedding.
+Even before we pass the corresponding board positions to the KataGo network, they have to be converted into input tensors with features such as “moving here captures the opponent in a ladder”. We precompute this expensive conversion with a new KataGo command implemented in my fork (linked at the top). Launch the command to generate an `.npz` (numpy archive) containing the recent move input tensors for every marked game (training, validation or test) in a list file as follows:
+
+```
+$ KATAGO=path/to/katago
+$ MODEL=path/to/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
+$ CONFIG=path/to/configs/analysis_example.cfg
+$ LIST=csv/games_labels.csv
+$ FEATUREDIR=path/to/featurecache
+$ WINDOWSIZE=500  # number of recent moves per game and player
+$ BATCHSIZE=400   # number of board positions sent to KataGo in one batch
+$ BATCHTHREADS=4  # number of concurrent worker threads, each running independent GPU batches
+$ katago extract_features -recompute -model $MODEL -config $CONFIG -list $LIST -featuredir $FEATUREDIR -window-size $WINDOWSIZE -batch-size $BATCHSIZE -batch-threads $BATCHTHREADS
+```
+
+The `-recompute` switch causes the program to overwrite any files left over from previous runs. Remove it to continue precomputation from the state of the previous, unfinished run.
+
+This step can be very time and resource intensive, especially with large datasets (multiple 10k marked games), large window size, large batch size and many batch threads. In case of crashes due to resource exhaustion, the process can be resumed without the `-recompute` switch.
 
 ## The Training Command
 
