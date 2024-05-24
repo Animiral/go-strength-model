@@ -4,6 +4,8 @@ from os.path import exists
 import csv
 import re
 from typing import List, Optional
+import zipfile
+import math
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -16,8 +18,6 @@ class PlayerGameEntry:
         self.rating = rating
         self.predictedRating = None
         self.prevGame = prevGame
-        self.features = None
-        self.recentMoves = None
 
 class GameEntry:
     """Represents one game in the list"""
@@ -39,58 +39,69 @@ class GameEntry:
 
 class MovesDataset(Dataset):
     """Load the dataset from a CSV list file"""
-    featureDims = 6  # TODO, adapt to whichever features we currently use
 
-    def __init__(self, listpath: str, featuredir: str, marker: str):
+    def __init__(self, listpath: str, featuredir: str, marker: str, *,
+      featurename: str = "pick", sparse: bool = True):
         self.featuredir = featuredir
         self.players: Dict[str, GameEntry] = {}  # stores last occurrence of player
         self.games = List[GameEntry]
 
-        with open(listpath, 'r') as listfile:
+        with open(listpath, "r") as listfile:
             reader = csv.DictReader(listfile)
-            self.games = [self._makeGameEntry(r) for r in reader]
+            self.games = [self._makeGameEntry(r) for r in reader if (not sparse) or marker == r["Set"]]
 
         self.marked = [g for g in self.games if g.marker == marker]
+        self.featurename = featurename  # used to select correct feature data from ZIP
 
     def __len__(self):
         return len(self.marked)
 
     def __getitem__(self, idx):
-        """Load recent move features on demand"""
+        """Load recent move features from disk"""
         game = self.marked[idx]
-        if game.black.recentMoves is None:
-            self._fillRecentMoves(game.black.name, game)
-        if game.white.recentMoves is None:
-            self._fillRecentMoves(game.white.name, game)
-        return (game.black.recentMoves, game.white.recentMoves, game.black.rating, game.white.rating, game.score)
+        blackRecent = self.loadRecentMoves("Black", game)
+        whiteRecent = self.loadRecentMoves("White", game)
+        return (blackRecent, whiteRecent, game.black.rating, game.white.rating, game.score)
 
     def write(self, outpath: str):
         """Write to CSV file including predictions data where applicable"""
-        with open(outpath, 'w') as outfile:
-            fieldnames = ['File','Player White','Player Black','Score','BlackRating','WhiteRating','PredictedScore','PredictedBlackRating','PredictedWhiteRating','Set']
+        with open(outpath, "w") as outfile:
+            fieldnames = ["File","Player White","Player Black","Score","BlackRating","WhiteRating","PredictedScore","PredictedBlackRating","PredictedWhiteRating","Set"]
             writer = csv.DictWriter(outfile, fieldnames=fieldnames)
             writer.writeheader()
             for game in self.marked:
                 row = {
-                    'File': game.sgfPath,
-                    'Player White': game.white.name,
-                    'Player Black': game.black.name,
-                    'Score': game.score,
-                    'BlackRating': game.black.rating,
-                    'WhiteRating': game.white.rating,
-                    'PredictedScore': game.predictedScore,
-                    'PredictedBlackRating': game.black.predictedRating,
-                    'PredictedWhiteRating': game.white.predictedRating,
-                    'Set': game.marker
+                    "File": game.sgfPath,
+                    "Player White": game.white.name,
+                    "Player Black": game.black.name,
+                    "Score": game.score,
+                    "BlackRating": game.black.rating,
+                    "WhiteRating": game.white.rating,
+                    "PredictedScore": game.predictedScore,
+                    "PredictedBlackRating": game.black.predictedRating,
+                    "PredictedWhiteRating": game.white.predictedRating,
+                    "Set": game.marker
                 }
                 writer.writerow(row)
 
-    def writeRecentMoves(self):
-        """Write to CSV files in the feature directory all the recent move specifications"""
-        for game in self.marked:
-            print(game.sgfPath)
-            self._writeRecentMovesIfNotExists(game.black.name, game)
-            self._writeRecentMovesIfNotExists(game.white.name, game)
+    def loadRecentMoves(self, player: str, game: GameEntry):
+        assert player in {"Black", "White"}
+        basePath, _ = os.path.splitext(game.sgfPath)
+        featurepath = f"{self.featuredir}/{basePath}_{player}Recent.zip"
+
+        with zipfile.ZipFile(featurepath, "r") as z:
+            with z.open("index.bin") as file:
+                file.seek(0, os.SEEK_END)
+                file_size = file.tell()
+                movecount = file_size // 4  # each index is a 32-bit int
+
+            if 0 == movecount:
+                return torch.empty(0, 0)
+
+            with z.open(f"{self.featurename}.bin") as file:
+                data = np.frombuffer(file.read(), dtype=np.float32)
+
+        return torch.tensor(data).reshape(movecount, -1)
 
     @staticmethod
     def _getScore(row):
@@ -102,9 +113,9 @@ class MovesDataset(Dataset):
             winner = row["Judgement"]
 
         w = winner[0].lower()
-        if 'b' == w:
+        if "b" == w:
             return 1
-        elif 'w' == w:
+        elif "w" == w:
             return 0
         else:
             print(f"Warning! Undecided game in dataset: {row['File']}")
@@ -112,21 +123,21 @@ class MovesDataset(Dataset):
 
     @staticmethod
     def _isSelected(self, row, setmarker):
-        if "Set" in row.keys() and '*' != setmarker:
+        if "Set" in row.keys() and "*" != setmarker:
             return setmarker == row["Set"]
         else:
             return True
 
     def _makePlayerGameEntry(self, row, color):
-        name = row['Player ' + color]
-        rating = float(row[color + 'Rating'])
+        name = row["Player " + color]
+        rating = float(row[color + "Rating"])
         prevGame = self.players.get(name, None)
         return PlayerGameEntry(name, rating, prevGame)
 
     def _makeGameEntry(self, row):
-        sgfPath = row['File']
-        black = self._makePlayerGameEntry(row, 'Black')
-        white = self._makePlayerGameEntry(row, 'White')
+        sgfPath = row["File"]
+        black = self._makePlayerGameEntry(row, "Black")
+        white = self._makePlayerGameEntry(row, "White")
         score = MovesDataset._getScore(row)
         marker = row["Set"]
         game = GameEntry(sgfPath, black, white, score, marker)
@@ -134,131 +145,86 @@ class MovesDataset(Dataset):
         self.players[white.name] = game  # set last occurrence
         return game
 
-    def _loadFeatures(self, game: GameEntry):
-        sgfPathWithoutExt, _ = os.path.splitext(game.sgfPath)
-        game.black.features = MovesDataset._readFeaturesFromFile(f"{self.featuredir}/{sgfPathWithoutExt}_BlackFeatures.bin");
-        game.white.features = MovesDataset._readFeaturesFromFile(f"{self.featuredir}/{sgfPathWithoutExt}_WhiteFeatures.bin");
+    # def _loadFeatures(self, game: GameEntry):
+    #     """Load POC features"""
+    #     sgfPathWithoutExt, _ = os.path.splitext(game.sgfPath)
+    #     game.black.features = MovesDataset._readFeaturesFromFile(f"{self.featuredir}/{sgfPathWithoutExt}_BlackFeatures.bin");
+    #     game.white.features = MovesDataset._readFeaturesFromFile(f"{self.featuredir}/{sgfPathWithoutExt}_WhiteFeatures.bin");
 
-    @staticmethod
-    def _readFeaturesFromFile(path: str):
-        FEATURE_HEADER = 0xfea70235  # feature file needs to start with this marker
+    # @staticmethod
+    # def _readFeaturesFromFile(path: str):
+    #     """Load POC features"""
+    #     FEATURE_HEADER = 0xfea70235  # feature file needs to start with this marker
+    #     featureDims = 6  # POC features
 
-        with open(path, 'rb') as file:
-            # Read and validate the header
-            header = np.fromfile(file, dtype=np.uint32, count=1)
-            if header.size == 0 or header[0] != FEATURE_HEADER:
-                raise IOError("Failed to read from feature file " + path)
+    #     with open(path, "rb") as file:
+    #         # Read and validate the header
+    #         header = np.fromfile(file, dtype=np.uint32, count=1)
+    #         if header.size == 0 or header[0] != FEATURE_HEADER:
+    #             raise IOError("Failed to read from feature file " + path)
 
-            features_flat = np.fromfile(file, dtype=np.float32)
+    #         features_flat = np.fromfile(file, dtype=np.float32)
 
-        count = len(features_flat) // MovesDataset.featureDims
-        return torch.from_numpy(features_flat).reshape(count, MovesDataset.featureDims)
+    #     count = len(features_flat) // featureDims
+    #     return torch.from_numpy(features_flat).reshape(count, featureDims)
 
-    def _fillRecentMoves(self, player: str, game: GameEntry, window: int = 1000):
-        recentMoves = torch.empty(0, MovesDataset.featureDims)
-        count = 0
-        gamePlayerEntry = game.playerEntry(player)
-        historic = gamePlayerEntry.prevGame
-
-        while count < window and historic is not None:
-            sgfPathWithoutExt, _ = os.path.splitext(historic.sgfPath)
-            entry = historic.playerEntry(player)
-            if entry.features is None:
-                color = 'Black' if historic.black.name == player else 'White'
-                featurepath = f"{self.featuredir}/{sgfPathWithoutExt}_{color}Features.bin"
-                entry.features = MovesDataset._readFeaturesFromFile(featurepath);
-                recentMoves = torch.cat((entry.features, recentMoves), dim=0)
-                count += entry.features.shape[0]
-
-            # trim to window size if necessary
-            if count > window:
-                recentMoves = recentMoves[slice(-window, None), slice(None)]
-
-            historic = entry.prevGame
-
-        gamePlayerEntry.recentMoves = recentMoves
-
-    @staticmethod
-    def _countGameMoves(path: str):
-        # We don't want to spend the time and really parse the SGF here, so let's do crude main-variation parsing.
-        # From the first move indicated by "B[", the main variation always comes first.
-        # Alternative variations may be present after a close paren to the main variation, so stop at that.
-        with open(path, 'r', encoding='utf-8') as file:
-            contents = file.read()
-
-        count = 0
-        bpattern, wpattern = re.compile(r'\WB\[\w'), re.compile(r'\WW\[\w')
-        black_next = True
-        match = bpattern.search(contents)
-        if not match:
-            import pdb; pdb.set_trace()
-        limit = contents.find(')', match.end())
-        contents = contents[:limit] if limit >= 0 else contents
-
-        while match:
-            count += 1
-            contents = contents[match.end():]
-            black_next = not black_next
-            pattern = bpattern if black_next else wpattern
-            match = pattern.search(contents)
-
-        return count
-
-    def _writeRecentMovesIfNotExists(self, player: str, game: GameEntry, window: int = 1000):
-        recentMoves = torch.empty(0, MovesDataset.featureDims)
-        count = 0
-        gamePlayerEntry = game.playerEntry(player)
-        historic = gamePlayerEntry.prevGame
-
-        color = 'Black' if game.black.name == player else 'White'
-        sgfPathWithoutExt, _ = os.path.splitext(game.sgfPath)
-        recentpath = f"{self.featuredir}/{sgfPathWithoutExt}_{color}RecentMoves.csv"
-
-        if exists(recentpath):
-            return  # this allows us to resume previously interrupted recent moves extraction
-
-        os.makedirs(os.path.dirname(recentpath), exist_ok=True) # ensure dir exists
-
-        with open(recentpath, 'w') as recentfile:
-            writer = csv.DictWriter(recentfile, fieldnames=['File','StartMove','Count'])
-            writer.writeheader()
-            while count < window and historic is not None:
-                entry = historic.playerEntry(player)
-                color = 'Black' if historic.black.name == player else 'White'
-                gamemoves = MovesDataset._countGameMoves(historic.sgfPath)
-                base = 0 if 'Black' == color else 1
-                mymoves = range(base, gamemoves, 2)
-                newcount = count + len(mymoves)
-                overshoot = max(0, newcount - window)
-                count = min(newcount, window)
-                if overshoot < 0 or overshoot >= len(mymoves):
-                    import pdb; pdb.set_trace()
-                startmove = mymoves[overshoot]
-                writer.writerow({'File': historic.sgfPath, 'StartMove': startmove, 'Count': len(mymoves)-overshoot})
-                historic = entry.prevGame
+def pad_collate_one(rs):
+    lens = [r.shape[0] for r in rs]
+    rs = [r for r in rs if len(r) > 0]
+    collated = torch.cat(rs, dim=0) if rs else torch.empty((0,0))
+    return lens, collated
 
 def pad_collate(batch):
     brecent, wrecent, brating, wrating, score = zip(*batch)
-    blens = [r.shape[0] for r in brecent]
-    wlens = [r.shape[0] for r in wrecent]
-    brecent, wrecent = torch.cat(brecent, dim=0), torch.cat(wrecent, dim=0)
+    blens, brecent = pad_collate_one(brecent)
+    wlens, wrecent = pad_collate_one(wrecent)
     brating, wrating, score = map(torch.Tensor, (brating, wrating, score))
     return brecent, wrecent, blens, wlens, brating, wrating, score
 
 class MovesDataLoader(DataLoader):
     def __init__(self, *args, **kwargs):
-        kwargs['collate_fn'] = pad_collate
+        kwargs["collate_fn"] = pad_collate
         super().__init__(*args, **kwargs)
+
+
+
+# Test/debug code (run module as standalone)
+
+def debugSummary(dataset):
+    def vecChecksum(vec):
+        # condense vec to a single printable number, likely different from vecs (trunks) of other positions,
+        # but also close in value to very similar vecs (tolerant of float inaccuracies)
+        accum = 0.0
+        sos = 0.0
+        weight = 1.0
+        decay = 0.9999667797285222 # = pow(0.01, (1/(vec.size()-1))) -> smallest weight is 0.01
+
+        for v in vec:
+            accum += v * weight
+            sos += v * v
+            weight *= decay
+
+        return accum + math.sqrt(sos)
+
+    sgfPath = "dataset/2005/12/29/13067-NPC-Reepicheep.sgf"
+    player = "White"
+    gameEntry = next((ge for ge in dataset.games if ge.sgfPath == sgfPath), None)
+    data = dataset.loadRecentMoves(player, gameEntry)
+    print(f"Found {data.shape[0]} recent picks for {sgfPath}.")
+    # ZIP_MOVEINDEX=132  # 123 + 9
+    for row in data:
+        print(f"pick {vecChecksum(row)}")
 
 if __name__ == "__main__":
     print("Test moves_dataset.py")
-    listpath = 'csv/games_labels.csv'
-    featuredir = 'featurecache'
-    marker = 'V'
-    dataset = MovesDataset(listpath, featuredir, marker)
+    listpath = "csv7M/games_labels.csv"
+    featuredir = "featurecache"
+    marker = "V"
+    dataset = MovesDataset(listpath, featuredir, marker, sparse=False)
     print(f"Loaded {len(dataset.games)} games, {len(dataset)} of type {marker}.")
+    debugSummary(dataset)
 
-    loader = DataLoader(dataset, batch_size=3, collate_fn=pad_collate)
+    # loader = DataLoader(dataset, batch_size=3, collate_fn=pad_collate)
 
-    for bx, wx, blens, wlens, by, wy, score in loader:
-        print(f"Got batch size bx: {bx.shape} ({blens}), wx: {wx.shape} ({wlens}); {by}; {wy}; {score}.")
+    # for bx, wx, blens, wlens, by, wy, score in loader:
+    #     print(f"Got batch size bx: {bx.shape} ({blens}), wx: {wx.shape} ({wlens}); {by}; {wy}; {score}.")
