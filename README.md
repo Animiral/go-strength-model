@@ -95,13 +95,15 @@ $ python3 python/random_split.py --input csv/games_judged.csv --output csv/games
 
 This will allocate 10000 rows to the training set, 5000 to the validation set and 5000 to the test set. Any remaining rows are left unassigned, but still part of the dataset, forming the players' histories and acting as a source of recent moves. Just the model will not be trained or tested on these data points. Because all games with a set marker (more specifically, their recent move sets) must be preprocessed through the KataGo network, it is not feasible to mark millions of games for training.
 
+Rows that introduce a specific player for the first time in the dataset are generally not eligible for marking as any set, because these rows do not offer the necessary prior information for a model to predict the match outcome. The optional `--withNovice` switch disables this behavior, making all rows eligible for inclusion in one of the sets.
+
 As an alternative usage, the splits can be specified as fractions. Omitting `--testPart` assigns all remaining rows to the test set.
 
 ```
 $ python3 python/random_split.py --input csv/games_judged.csv --output csv/games_judged.csv --trainingPart 0.8 --validationPart 0.1
 ```
 
-This will allocate 80% of all rows to the training set, 10% to the validation set and the remaining 10% to the test set.
+This will allocate 80% of eligible rows to the training set, 10% to the validation set and the remaining 10% to the test set.
 
 Once allocated, the script can also copy the same set markers to a different CSV file, as long as the "copy-from" file has both "File" and "Set" headers and holds the information on every "File" listed in the input CSV file:
 
@@ -233,21 +235,26 @@ This step can be very time and resource intensive, especially with large dataset
 
 ## The Training Command
 
-The modified KataGo version from my fork (see above) implements the new `strength_training` command. Invoke it from the shell like this:
+We use the `train.py` script included in this repository to train the strength model on the above precomputed data. Invoke it from the shell like this:
 
 ```
-$ KATAGO=path/to/katago
-$ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
-$ CONFIG=configs/strength_analysis_example.cfg
-$ LISTFILE=csv/games_labels.csv
-$ FEATUREDIR=path/to/featurecache
-$ katago strength_training -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
+LIST=csv/games_labels.csv
+FEATUREDIR=path/to/featurecache
+OUTFILE=nets/strmodel{}.pth
+TRAINLOSSFILE=logs/strtrainloss.txt
+TESTLOSSFILE=logs/strtestloss.txt
+BATCHSIZE=100
+STEPS=50
+EPOCHS=100
+
+python3 python/model/train.py $LIST $FEATUREDIR --outfile "$OUTFILE" \
+  --batch-size $BATCHSIZE --steps $STEPS --epochs $EPOCHS \
+  --trainlossfile $TRAINLOSSFILE --testlossfile $TESTLOSSFILE
 ```
 
 Please keep in mind that relative SGF paths in `LISTFILE` must be relative to the current working directory.
-If the `LISTFILE` contains the "Set" column from the previous step, the matches will be used according to their designation. The program trains the model on training matches, reporting progress on the training and validation sets after every epoch.
-
-Currently, the model is a simple proof of concept. After training completes, the result is saved in the file given as `STRENGTH_MODEL`.
+The `LISTFILE` must contain the "Set" column from the labeling step. The script uses 'T' (training) rows for training and 'V' (validation) rows to check performance.
+After every epoch, the trained network weights are saved in a separate file according to the pattern given as `OUTFILE`. The epoch number takes the place of the placeholder `{}` in the final name.
 
 # Evaluation
 
@@ -279,18 +286,18 @@ The output file contains the results of the rating calculation, directly compara
 
 ## Strength Model Calculation
 
-Once the strength model is trained, we can apply it to a dataset by invoking modified KataGo as above, with the `-strengthmodel` parameter:
+Once the strength model is trained, we can apply it to a dataset by invoking the script `eval.py`.
 
 ```
-$ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
-$ CONFIG=configs/analysis_example.cfg
-$ LISTFILE=csv/games_judged.csv
-$ OUTFILE=csv/games_strmodel.csv
+$ LIST=csv/games_labels.csv
 $ FEATUREDIR=path/to/featurecache
-$ katago rating_system -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -outlist $OUTFILE -featuredir $FEATUREDIR -set V
+$ MODELFILE=path/to/strengthmodel.pth
+$ OUTFILE=csv/games_strmodel.csv
+
+python3 python/model/eval.py "$LIST" "$FEATUREDIR" "$MODELFILE" --outfile "$OUTFILE" --setmarker V
 ```
 
-The `-featuredir` is again mandatory and the output file is a valid rating calculation file.
+The output file contains the games from the list that match the given set marker, extended by new columns for predicted ratings and score.
 
 ## Rating the Rating Systems
 
@@ -356,3 +363,36 @@ $ KATA_MODEL=path/to/model.bin.gz
 $ FEATUREDIR=path/to/featurecache
 $ katago extract_pocfeatures -model $KATA_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
 ```
+
+## Training the C++ Proof of Concept Model
+
+This implementation of the proof of concept strength model is obsolete. It can be trained using the modified KataGo version from my fork (see above). It implements the new `strength_training` command. Invoke it from the shell like this:
+
+```
+$ KATAGO=path/to/katago
+$ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
+$ CONFIG=configs/strength_analysis_example.cfg
+$ LISTFILE=csv/games_labels.csv
+$ FEATUREDIR=path/to/featurecache
+$ katago strength_training -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
+```
+
+Please keep in mind that relative SGF paths in `LISTFILE` must be relative to the current working directory.
+If the `LISTFILE` contains the "Set" column from the previous step, the matches will be used according to their designation. The program trains the model on training matches, reporting progress on the training and validation sets after every epoch.
+
+After training completes, the result is saved in the file given as `STRENGTH_MODEL`.
+
+## Calculation by the C++ Proof of Concept Model
+
+This implementation of the proof of concept strength model is obsolete. However, with such a trained model, we can apply it to a dataset by invoking modified KataGo with the `-strengthmodel` parameter:
+
+```
+$ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
+$ CONFIG=configs/analysis_example.cfg
+$ LISTFILE=csv/games_judged.csv
+$ OUTFILE=csv/games_strmodel.csv
+$ FEATUREDIR=path/to/featurecache
+$ katago rating_system -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -outlist $OUTFILE -featuredir $FEATUREDIR -set V
+```
+
+The `-featuredir` is again mandatory and the output file is a valid rating calculation file.

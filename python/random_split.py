@@ -12,6 +12,27 @@ import argparse
 import csv
 import random
 
+def eligibleRows(csvrows):
+    """Mask out rows where one player is new in the system, giving us no prior info."""
+    occurred = set()
+    mask = []
+
+    for row in csvrows:
+        white, black = row["Player White"], row["Player Black"]
+        if white in occurred and black in occurred:
+            mask.append(True)
+        else:
+            mask.append(False)
+            occurred.add(white)
+            occurred.add(black)
+
+    return mask
+
+def spread(markers, mask):
+    """Distribute shuffled markers over eligible rows."""
+    it = iter(markers)
+    return ['-' if not el else next(it) for el in mask]
+
 if __name__ == "__main__":
     description = """
     Add or modify the “Set” column to random distribution of T/V/E according to split.
@@ -54,6 +75,12 @@ if __name__ == "__main__":
         help="Part of total records which should be given the test set marker",
         required=False
     )
+    parser.add_argument(
+        "-n", "--withNovice",
+        default=False,
+        type=bool,
+        help="Mark even such records where (one of) the players occurs for the first time.",
+    )
     args = parser.parse_args()
     print(vars(args))
 
@@ -79,7 +106,8 @@ if __name__ == "__main__":
     else:
         trainingPart = args.trainingPart
         validationPart = args.validationPart
-        rowCount = len(rows)
+        mask = [True] * len(rows) if args.withNovice else eligibleRows(rows)
+        rowCount = sum(mask)
         trainCount = int(round(rowCount * args.trainingPart) if args.trainingPart < 1 else args.trainingPart)
         validationCount = int(round(rowCount * args.validationPart) if args.validationPart < 1 else args.validationPart)
         if args.testPart is None:
@@ -91,10 +119,11 @@ if __name__ == "__main__":
             print(f"Not enough rows to mark them! T={trainCount}, V={validationCount}, E={testCount}, rows={rowCount}")
             exit()
 
-        print(f"Randomly splitting {len(rows)} rows {trainingPart}/{validationPart}/...: {trainCount} training, {validationCount} validation, {testCount} testing.")
+        print(f"Randomly splitting {rowCount} of {len(rows)} rows {trainingPart}/{validationPart}/...: {trainCount} training, {validationCount} validation, {testCount} testing.")
 
         markers = list('T'*trainCount + 'V'*validationCount + 'E'*testCount + '-'*remainder)
         random.shuffle(markers)
+        markers = spread(markers, mask)
 
         for r, m in zip(rows, markers):
             r["Set"] = m
