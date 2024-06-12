@@ -95,6 +95,8 @@ $ python3 python/random_split.py --input csv/games_judged.csv --output csv/games
 
 This will allocate 10000 rows to the training set, 5000 to the validation set and 5000 to the test set. Any remaining rows are left unassigned, but still part of the dataset, forming the players' histories and acting as a source of recent moves. Just the model will not be trained or tested on these data points. Because all games with a set marker (more specifically, their recent move sets) must be preprocessed through the KataGo network, it is not feasible to mark millions of games for training.
 
+If not specified, the `--output` file defaults to the same as the `--input`, overwriting it with the added information.
+
 Rows that introduce a specific player for the first time in the dataset are generally not eligible for marking as any set, because these rows do not offer the necessary prior information for a model to predict the match outcome. The optional `--withNovice` switch disables this behavior, making all rows eligible for inclusion in one of the sets.
 
 As an alternative usage, the splits can be specified as fractions. Omitting `--testPart` assigns all remaining rows to the test set.
@@ -214,8 +216,15 @@ $ python3 python/label_gameset.py --list csv/games_glicko.csv --output csv/games
 
 ## Precomputation
 
-The strength prediction for a player is based on a large number of *recent moves*, every one of which must be evaluated by the KataGo network to find its embedding.
-Even before we pass the corresponding board positions to the KataGo network, they have to be converted into input tensors with features such as “moving here captures the opponent in a ladder”. We precompute this expensive conversion with a new KataGo command implemented in my fork (linked at the top). Launch the command to generate an `.npz` (numpy archive) containing the recent move input tensors for every marked game (training, validation or test) in a list file as follows:
+The strength prediction for a player is based on a large number of *recent moves*, every one of which must be evaluated by the KataGo network to find its features.
+
+The precomputation of recent move features is built into my fork of KataGo in the form of the new command `extract_features`. This extractor currently supports three types of features:
+
+* *Head features* are derived from the usual output of the KataGo network. They include *winrate loss* and *points loss*, which require evaluating both the position before and after the move in question. We use these features in our basic stochastic model and as data to train our proof-of-concept model.
+* *Trunk features* simply contain the entire trunk output of the KataGo network from the board state of the recent move. They take too much time and generate too much data for our dataset with 20000 marked rows (see *Splitting the Dataset* above).
+* *Pick features* contain the feature vector from the trunk output associated with the board location where the stone was placed. We use these features to train our full model.
+
+Invoke the `extract_features` command as follows:
 
 ```
 $ KATAGO=path/to/katago
@@ -223,15 +232,26 @@ $ MODEL=path/to/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
 $ CONFIG=path/to/configs/analysis_example.cfg
 $ LIST=csv/games_labels.csv
 $ FEATUREDIR=path/to/featurecache
-$ WINDOWSIZE=500  # number of recent moves per game and player
-$ BATCHSIZE=400   # number of board positions sent to KataGo in one batch
-$ BATCHTHREADS=4  # number of concurrent worker threads, each running independent GPU batches
-$ katago extract_features -recompute -model $MODEL -config $CONFIG -list $LIST -featuredir $FEATUREDIR -window-size $WINDOWSIZE -batch-size $BATCHSIZE -batch-threads $BATCHTHREADS
+$ SELECTION="-with-trunk -with-pick -with-head"  # feature categories to precompute
+$ WINDOWSIZE=500   # number of recent moves per game and player
+$ BATCHSIZE=10     # number of board positions sent to KataGo in one batch
+$ BATCHTHREADS=8   # number of concurrent worker threads launching independent NN batches to the GPU
+$ WORKERTHREADS=8  # number of concurrent CPU workers to prepare NN inputs and process NN outputs
+
+$ katago extract_features $SELECTION -model $MODEL -config $CONFIG -list $LIST -featuredir $FEATUREDIR \
+                          -window-size $WINDOWSIZE -batch-size $BATCHSIZE -batch-threads $BATCHTHREADS \
+                          -worker-threads $WORKERTHREADS
 ```
 
-The `-recompute` switch causes the program to overwrite any files left over from previous runs. Remove it to continue precomputation from the state of the previous, unfinished run.
+KataGo reads the given list file and determines the recent move set for every marked game in the dataset. It uses its network to evaluate all the necessary positions from which it derives the features specified in the selection parameters.
+The features associated with the recent moves are grouped by the game in which they occur and the player's color, then written to a zip file on disk stored in the feature cache directory. The file name ends in `Features.zip`.
+Once all recent move features are avialable per recent game, it combines them into recent move set archives with file names based on the game and player color that these moves are recent for and stores them in the feature cache directory. The file name ends in `Recent.zip`. These are our data sources for model training.
 
-This step can be very time and resource intensive, especially with large datasets (multiple 10k marked games), large window size, large batch size and many batch threads. In case of crashes due to resource exhaustion, the process can be resumed without the `-recompute` switch.
+For example, if game 110 between players P and Q is in the training set, where P has recent moves in games 101, 105 and 107, while Q has recent moves in games 102 and 106, then the extractor creates `Features.zip` archives for games 101, 102, 105, 106 and 107. These combine into one `Recent.zip` archive for each side in game 110.
+
+This tool supports two more command line switches. The `-recompute` switch causes the program to overwrite any files left over from previous runs. Omit it to continue precomputation from the state of the previous, unfinished run. The `-print-recent-moves` switch outputs some debug information (not just recent moves).
+
+This step can be very time and resource intensive, especially with large datasets (multiple 10k marked games), large window size, large batch size and many threads. Try different parameters to find an acceptable balance between speed and resource use on your system. In case of crashes due to resource exhaustion, the process can be resumed without the `-recompute` switch.
 
 ## The Training Command
 
