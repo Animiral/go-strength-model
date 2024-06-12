@@ -82,19 +82,23 @@ def main(listpath, setmarker='V', fixed_prediction=False):
     # File,Player White,Player Black,Winner,WhiteWinrate,BlackRating,WhiteRating
     with open(listpath, 'r') as infile:
         for row in csv.DictReader(infile):
+            # keep track of players occurred, even for rows not selected
+            player_white = row['Player White']
+            player_black = row['Player Black']
+            row_withinfo = player_white in players or player_black in players
+            row_fullinfo = player_white in players and player_black in players
+            players.add(player_white)
+            players.add(player_black)
+
             if not isSelected(row, setmarker):
                 continue
 
-            player_white = row['Player White']
-            player_black = row['Player Black']
             score = getScore(row)
             predScore = 0.5 if fixed_prediction else getPredScore(row)
             if score > 0.5: # black win
                 row_success = predScore > 0.5
             else: # white win
                 row_success = predScore <= 0.5 # a dead center pred. counts as white due to a priori chance
-            row_withinfo = player_white in players or player_black in players
-            row_fullinfo = player_white in players and player_black in players
             row_logp = tolerant_log(1.-abs(score-predScore))
 
             count = count + 1
@@ -111,8 +115,6 @@ def main(listpath, setmarker='V', fixed_prediction=False):
             if row_fullinfo:
                 logp_fullinfo = logp_fullinfo + row_logp
 
-            players.add(player_white)
-            players.add(player_black)
             # print(f"{player_black} vs {player_white}: s={score}, p={predScore}, log(p)={row_logp}")
 
     count_withinfo = count - zeroinfo
