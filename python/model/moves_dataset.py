@@ -52,6 +52,7 @@ class MovesDataset(Dataset):
 
         self.marked = [g for g in self.games if g.marker == marker]
         self.featurename = featurename  # used to select correct feature data from ZIP
+        self.featureDims = self._findFeatureDims()
 
     def __len__(self):
         return len(self.marked)
@@ -84,24 +85,42 @@ class MovesDataset(Dataset):
                 }
                 writer.writerow(row)
 
-    def loadRecentMoves(self, player: str, game: GameEntry):
+    def loadRecentMoves(self, player: str, game: GameEntry, featurename: str = ""):
         assert player in {"Black", "White"}
-        basePath, _ = os.path.splitext(game.sgfPath)
-        featurepath = f"{self.featuredir}/{basePath}_{player}Recent.zip"
+        if "" == featurename:
+            featurename = self.featurename  # default
+            featureDims = self.featureDims  # known/detected by _findFeatureDims
+        else:
+            featureDims = -1  # guess
 
-        with zipfile.ZipFile(featurepath, "r") as z:
-            with z.open("index.bin") as file:
+        basePath, _ = os.path.splitext(game.sgfPath)
+        featurePath = f"{self.featuredir}/{basePath}_{player}Recent.zip"
+
+        with zipfile.ZipFile(featurePath, "r") as z:
+            with z.open("turn.bin") as file:
                 file.seek(0, os.SEEK_END)
                 file_size = file.tell()
-                movecount = file_size // 4  # each index is a 32-bit int
+                movecount = file_size // 4  # each turn index is a 32-bit int
 
             if 0 == movecount:
-                return torch.empty(0, 0)
+                return torch.empty(0, featureDims if featureDims > 0 else 0)
 
-            with z.open(f"{self.featurename}.bin") as file:
+            with z.open(f"{featurename}.bin") as file:
                 data = np.frombuffer(file.read(), dtype=np.float32)
 
-        return torch.tensor(data).reshape(movecount, -1)
+        return torch.tensor(data).reshape(movecount, featureDims)
+
+    def _findFeatureDims(self):
+        """Discover feature dimensions by loading recent move data, assuming they are consistent."""
+        self.featureDims = -1  # this causes reshape() in loadRecentMoves to guess
+        for game in self.games:
+            try:
+                data = self.loadRecentMoves('Black', game)
+            except FileNotFoundError:
+                continue
+            if len(data) > 0:
+                return data.shape[1]
+        raise ValueError("Cannot discover feature dims: no recent move data found for any game.")
 
     @staticmethod
     def _getScore(row):

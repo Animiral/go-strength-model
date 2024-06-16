@@ -18,7 +18,7 @@ def main(args):
     print(f"Device: {device}")
 
     data = MovesDataset(listfile, featuredir, setmarker)
-    model = StrengthNet(MovesDataset.featureDims).to(device)
+    model = StrengthNet(data.featureDims).to(device)
     model.load_state_dict(torch.load(modelfile))
 
     for i, game in enumerate(data.marked):

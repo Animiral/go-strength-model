@@ -37,7 +37,7 @@ def main(args):
     test_data = MovesDataset(listfile, featuredir, 'V')
     test_loader = MovesDataLoader(test_data, batch_size=batch_size)
 
-    model = StrengthNet(MovesDataset.featureDims).to(device)
+    model = StrengthNet(train_data.featureDims).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
     if outfile:

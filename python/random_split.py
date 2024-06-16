@@ -12,24 +12,31 @@ import argparse
 import csv
 import random
 
-def eligibleRows(csvrows):
+def eligibleRows(csvrows, modify: bool):
     """Mask out rows where one player is new in the system, giving us no prior info."""
     occurred = set()
     mask = []
 
     for row in csvrows:
         white, black = row["Player White"], row["Player Black"]
-        if white in occurred and black in occurred:
+        if modify and "Set" in row and row["Set"] != "-":
+            mask.append(False)
+        elif white in occurred and black in occurred:
             mask.append(True)
         else:
             mask.append(False)
-            occurred.add(white)
-            occurred.add(black)
+        occurred.add(white)
+        occurred.add(black)
 
     return mask
 
+def countRows(csvrows, setmarker: str, excludeMask):
+    assert len(mask) == len(csvrows)
+    return sum(1 for i, row in enumerate(csvrows) if row["Set"] == setmarker and not excludeMask[i])
+
 def spread(markers, mask):
     """Distribute shuffled markers over eligible rows."""
+    assert len(markers) == sum(mask)
     it = iter(markers)
     return ['-' if not el else next(it) for el in mask]
 
@@ -49,6 +56,12 @@ if __name__ == "__main__":
         default="",
         type=str,
         help="Path to the CSV file which already holds the set information to copy to the output.",
+    )
+    parser.add_argument(
+        "-m", "--modify",
+        default=False,
+        type=bool,
+        help="Adapt existing set assignments to the given numbers, changing as few rows as possible.",
     )
     parser.add_argument(
         "-o", "--output",
@@ -99,24 +112,52 @@ if __name__ == "__main__":
         infile.close()
 
     if args.copy:
+        assert not args.modify, "incompatible arguments: --copy and --modify"
         print(f"Copying training/validation/test set markers from {args.copy}.")
 
         for r in rows:
-            r["Set"] = markerlookup[r["File"]]
+            r["Set"] = markerlookup.get(r["File"], "-")  # tolerate copy from small dataset to larger dataset
     else:
         trainingPart = args.trainingPart
         validationPart = args.validationPart
-        mask = [True] * len(rows) if args.withNovice else eligibleRows(rows)
+
+        # find all rows that we can mark
+        mask = [True] * len(rows) if args.withNovice else eligibleRows(rows, args.modify)
         rowCount = sum(mask)
-        trainCount = int(round(rowCount * args.trainingPart) if args.trainingPart < 1 else args.trainingPart)
-        validationCount = int(round(rowCount * args.validationPart) if args.validationPart < 1 else args.validationPart)
+
+        # determine how many assignments to which set among eligible rows
+        if args.trainingPart < 1:
+            trainCount = int(round(rowCount * args.trainingPart))
+        else:
+            trainCount = args.trainingPart
+        if args.modify:
+            preexisting = countRows(csvrows, "T", mask)
+            assert preexisting <= trainCount, "Modification to reduce dataset size is not supported"
+            trainCount -= preexisting
+
+        if args.validationPart < 1:
+            validationCount = int(round(rowCount * args.validationPart))
+        else:
+            validationCount = args.validationPart
+        if args.modify:
+            preexisting = countRows(csvrows, "V", mask)
+            assert preexisting <= validationCount, "Modification to reduce dataset size is not supported"
+            validationCount -= preexisting
+
         if args.testPart is None:
             testCount = rowCount - trainCount - validationCount
+        elif args.testPart < 1:
+            testCount = int(round(rowCount * args.testPart))
         else:
-            testCount = int(round(rowCount * args.testPart) if args.testPart < 1 else args.testPart)
+            testCount = args.testPart
+        if args.modify:
+            preexisting = countRows(csvrows, "E", mask)
+            assert preexisting <= testCount, "Modification to reduce dataset size is not supported"
+            testCount -= preexisting
+
         remainder = rowCount - trainCount - validationCount - testCount
         if remainder < 0:
-            print(f"Not enough rows to mark them! T={trainCount}, V={validationCount}, E={testCount}, rows={rowCount}")
+            print(f"Not enough rows to mark them! T={trainCount}, V={validationCount}, E={testCount}, eligible rows={rowCount}/{len(rows)}")
             exit()
 
         print(f"Randomly splitting {rowCount} of {len(rows)} rows {trainingPart}/{validationPart}/...: {trainCount} training, {validationCount} validation, {testCount} testing.")

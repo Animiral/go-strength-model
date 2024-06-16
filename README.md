@@ -253,6 +253,24 @@ This tool supports two more command line switches. The `-recompute` switch cause
 
 This step can be very time and resource intensive, especially with large datasets (multiple 10k marked games), large window size, large batch size and many threads. Try different parameters to find an acceptable balance between speed and resource use on your system. In case of crashes due to resource exhaustion, the process can be resumed without the `-recompute` switch.
 
+After successful completion, check the result using `checkdataset.py` found in this repository:
+
+```
+$ LIST=csv/games_labels.csv
+$ FEATUREDIR=path/to/featurecache
+$ SELECTION="-require-trunk -require-pick -require-head"  # features to check
+$ python3 python/checkdataset.py $LIST $FEATUREDIR $SELECTION
+```
+
+This script tallies up all marked games in every set and look at their recent move zip files. If required files or features in them are missing or of inconsistent size, the affected game is listed in an error summary at the end. Ideally, the end of its output should look like this, with desired feature sets "all" present:
+
+```
+Dataset checked, 10000 train/5000 validation/5000 test, 0 errors.
+  head features? all
+  pick features? all
+  trunk features? none
+```
+
 ## The Training Command
 
 We use the `train.py` script included in this repository to train the strength model on the above precomputed data. Invoke it from the shell like this:
