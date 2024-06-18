@@ -133,7 +133,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Calculate the prediction success rate and log-likelihood of a rating system run record CSV.")
     parser.add_argument("list", type=str, help='Path to the CSV file listing the games, results and winrate.')
     parser.add_argument("-m", "--setmarker", type=str, default="*", help='Calculate on "T": training set, "V": validation set, "E": test set, "*": all')
-    parser.add_argument("--fixed-prediction", type=bool, default=False, help='Ignore predictions, instead predict 50:50 chances on every single game')
+    parser.add_argument("--fixed-prediction", action="store_true", help='Ignore predictions, instead predict 50:50 chances on every single game')
     args = parser.parse_args()
 
     if args.setmarker not in ['T', 'V', 'E', '*']:

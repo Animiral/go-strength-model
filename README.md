@@ -1,6 +1,6 @@
 This repository contains scripts, utilities and material for my strength model based on KataGo, which is the subject of my master thesis.
 
-The strength model is a neural network model which uses the existing KataGo infrastructure and a new additional strength head component to predict players' strength rating from recent moves played. This document gives you step-by-step instructions for training and running the strength model.
+The strength model is a neural network model which uses the existing KataGo network to interpret Go positions and moves. It uses the internal result representation of KataGo as input in its own architecture to predict players' strength rating from recent moves played. This document gives you step-by-step instructions for training and running the strength model.
 
 Python scripts are located in the `python` subdirectory. By convention, we dump CSV files in the `csv` subdirectory, which you may need to create first.
 
@@ -17,7 +17,7 @@ The following external dependencies are required:
   - my [fork of the goratings repository](https://github.com/Animiral/goratings), originally [here](https://github.com/online-go/goratings)
   - a dataset to work on, like the [OGS 2021 collection](https://archive.org/details/ogs2021)
 
-# Estimate Playing Strength
+# Estimate Playing Strength (obsolete! to be reworked)
 
 Using the modified KataGo and a strength model file, we can let the program estimate a player's Glicko rating.
 The strength model file can be obtained, for example, by following the further steps in this README to train it on an existing game dataset.
@@ -130,7 +130,9 @@ Since the scripts in goratings use integer IDs for games and players, we need to
 $ python3 python/name_ratings.py --list csv/games_judged.csv --ratings csv/games_glicko_ids.csv --output csv/games_glicko.csv
 ```
 
-This step is “dataset preparation” in the sense that we may train our model on future Glicko ratings, see Training section below. Otherwise, Glicko-2 is a reference rating system for us.
+We make use of Glicko-2 ratings in two ways.
+First, it provides the after-game ratings `BlackRating` and `WhiteRating` as the basis for future Glicko ratings labels, which our models are trained and evaluated on, see Training section below.
+Second, it is our reference rating system. The `PredictedScore`, `PredictedBlackRating` and `PredictedWhiteRating` columns allow us to measure the performance of Glicko-2 itself on our dataset.
 
 # Dataset Viewer
 
@@ -191,7 +193,7 @@ $
 # Training
 
 Using the dataset as prepared above, we can train the strength model on it – either from scratch, or by loading an existing model file.
-The strength model is implemented as a modification to KataGo, the C++ program. Note that KataGo, apart from its main program, also consists of Python scripts which are used to train the KataGo model itself. We disregard these training programs, as our training is implemented entirely in C++.
+The strength model is implemented in Python using PyTorch. It requires that the input game(s) are preprocessed through the KataGo network to obtain the strength model input features for every move. TODO: unify this process in one script
 
 ## Labeling Games
 
@@ -303,24 +305,32 @@ The required columns are:
 * `Player Black` and `Player White`, to distinguish between first-timers and players with information attached
 * `Set` (optional), to calculate only on set `T`, `V` or `E` (e.g. `V` for validation set)
 
-These columns are present in the files produced in the relevant sections: `games_glicko.csv` from “Glicko-2 Calculation” above, and the outputs of the following steps.
+The primary measurable quality of a rating system is determined by its ability to predict the winners of matchups as they happen. When the higher-rated player beats the lower-rated player, the system was successful. Moreover, we value not just the number of successfully predicted matchups, but also the degree of the prediction. The higher the prior rating of the eventual winner compared to the the loser, the more performant our system.
+We measure the success rate as the number of successful predictions divided by the total number of matches. We measure the performance as the average of log-likelihoods of every outcome prediction (logp). This is the log-likelihood of all the outcomes happening as they did according to the rating system based on the prior information at the time, scaled with dataset size for better comparison.
+
+Given a rating calculation file with the above columns, the script `calc_performance.py` tells us the success rate and log-likelihood achieved by the system.
+
+```
+$ python3 python/calc_performance.py csv/games_glicko.csv -m V
+```
+
+In this example, we evaluate the output file of the Glicko-2 Calculation above, establishing the performance of our reference system. In the following sections, we obtain evaluation files for our own models.
 
 ## Stochastic Model Calculation
 
 The Stochastic Model is a simple idea that we can predict winning chances based on the expected points loss of both players in their match.
-It is implemented in the modified KataGo (needs to be compiled from my fork, see above) with the `rating_system` command.
+It is implemented in the script `stochasticmodel.py`.
 
 ```
-$ CONFIG=configs/analysis_example.cfg
-$ LISTFILE=csv/games_judged.csv
-$ OUTFILE=csv/games_stochastic.csv
+$ LISTFILE=csv/games_labels.csv
 $ FEATUREDIR=path/to/featurecache
-$ katago rating_system -config $CONFIG -list $LISTFILE -outlist $OUTFILE -featuredir $FEATUREDIR -set V
+$ MARKER=V
+$ OUTFILE=csv/games_stochastic_$MARKER.csv
+$ python3 python/stochasticmodel.py $LISTFILE $FEATUREDIR -m $MARKER $OUTFILE
 ```
 
-The `-featuredir` is mandatory and must hold the precomputed extracted move features for every game. These must be prepared by `extract_features` as outlined above.
-
-The output file contains the results of the rating calculation, directly comparable to the output of the Glicko-2 analysis script above.
+This model requires precomputed head features for all marked records.
+The output file contains the predicted game outcomes for feeding into the performance calculation script.
 
 ## Strength Model Calculation
 
@@ -337,16 +347,6 @@ python3 python/model/eval.py "$LIST" "$FEATUREDIR" "$MODELFILE" --outfile "$OUTF
 
 The output file contains the games from the list that match the given set marker, extended by new columns for predicted ratings and score.
 
-## Rating the Rating Systems
-
-The quality of a rating system is measured by its ability to predict the winners of matchups as they happen. When the higher-rated player beats the lower-rated player, the system was successful. Moreover, we value not just the number of successfully predicted matchups, but also the degree of the prediction. The higher the prior rating of the eventual winner compared to the the loser, the more performant our system.
-We measure the success rate as the number of successful predictions divided by the total number of matches. We measure the performance as the average of log-likelihoods of every outcome prediction (logp). This is the log-likelihood of all the outcomes happening as they did according to the rating system based on the prior information at the time, scaled with dataset size for better comparison.
-
-Given a rating calculation file as defined above, the script `calc_performance.py` tells us the success rate and log-likelihood achieved by the system. It also counts with and without games involving new players, who come into the system with no prior information.
-
-```
-$ python3 python/calc_performance.py csv/games_strmodel.csv -m V
-```
 
 # Tests
 
@@ -434,3 +434,20 @@ $ katago rating_system -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LIS
 ```
 
 The `-featuredir` is again mandatory and the output file is a valid rating calculation file.
+
+## Stochastic Model Calculation Implemented in C++
+
+TThis implementation of the Stochastic model is obsolete. The Stochastic Model is a simple idea that we can predict winning chances based on the expected points loss of both players in their match.
+It is implemented in the modified KataGo (needs to be compiled from my fork, see above) with the `rating_system` command.
+
+```
+$ CONFIG=configs/analysis_example.cfg
+$ LISTFILE=csv/games_judged.csv
+$ OUTFILE=csv/games_stochastic.csv
+$ FEATUREDIR=path/to/featurecache
+$ katago rating_system -config $CONFIG -list $LISTFILE -outlist $OUTFILE -featuredir $FEATUREDIR -set V
+```
+
+The `-featuredir` is mandatory and must hold the precomputed extracted move features for every game. These must be prepared by `extract_features` as outlined above.
+
+The output file contains the results of the rating calculation, directly comparable to the output of the Glicko-2 analysis script above.

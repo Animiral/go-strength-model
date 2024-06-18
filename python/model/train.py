@@ -11,6 +11,7 @@ device = "cuda"
 def main(args):
     listfile = args["listfile"]
     featuredir = args["featuredir"]
+    featurename = args["featurename"]
     outfile = args["outfile"]
     trainlossfile = args["trainlossfile"]
     testlossfile = args["testlossfile"]
@@ -19,7 +20,7 @@ def main(args):
     epochs = args["epochs"]
 
     print(f"Load training data from {listfile}")
-    print(f"Load precomputed features from {featuredir}")
+    print(f"Load precomputed {featurename} features from {featuredir}")
     print(f"Save model(s) to {outfile}")
     print(f"Batch size: {batch_size}")
     print(f"Steps: {steps}")
@@ -33,8 +34,8 @@ def main(args):
         print(f"Write validation loss to {testlossfile}")
         testlossfile = open(testlossfile, 'w')
 
-    train_data = MovesDataset(listfile, featuredir, 'T')
-    test_data = MovesDataset(listfile, featuredir, 'V')
+    train_data = MovesDataset(listfile, featuredir, 'T', featurename=featurename)
+    test_data = MovesDataset(listfile, featuredir, 'V', featurename=featurename)
     test_loader = MovesDataLoader(test_data, batch_size=batch_size)
 
     model = StrengthNet(train_data.featureDims).to(device)
@@ -121,7 +122,8 @@ if __name__ == "__main__":
         help='show this help message and exit'
     )
     required_args.add_argument('listfile', help='CSV file listing games and labels')
-    required_args.add_argument('featuredir', help='directory containing extracted features')
+    required_args.add_argument('featuredir', help='Directory containing extracted features')
+    optional_args.add_argument('-f', '--featurename', help='Type of features to train on', type=str, default='pick', required=False)
     optional_args.add_argument('-o', '--outfile', help='Pattern for model output, with epoch placeholder "{}" ', type=str, required=False)
     optional_args.add_argument('-b', '--batch-size', help='Minibatch size', type=int, default=100, required=False)
     optional_args.add_argument('-t', '--steps', help='Number of batches per epoch', type=int, default=100, required=False)

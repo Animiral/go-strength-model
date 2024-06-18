@@ -1,0 +1,12 @@
+Evaluate games from /home/user/thesis/win/go-strength-model/csv7M/games_labels.csv marked 'T'
+Load precomputed head features from /home/user/thesis/win/go-strength-model/featurecache
+Save results to /home/user/thesis/win/go-strength-model/csv7M/games_pocmodel_t.csv
+Device: cuda
+Evaluate games from /home/user/thesis/win/go-strength-model/csv7M/games_labels.csv marked 'V'
+Load precomputed head features from /home/user/thesis/win/go-strength-model/featurecache
+Save results to /home/user/thesis/win/go-strength-model/csv7M/games_pocmodel_v.csv
+Device: cuda
+Evaluate games from /home/user/thesis/win/go-strength-model/csv7M/games_labels.csv marked 'E'
+Load precomputed head features from /home/user/thesis/win/go-strength-model/featurecache
+Save results to /home/user/thesis/win/go-strength-model/csv7M/games_pocmodel_e.csv
+Device: cuda

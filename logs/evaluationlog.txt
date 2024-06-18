@@ -1,75 +1,12 @@
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_glicko.csv -m V
-Finished counting run of 184 matchups between 113 players.
-Prediction accuracy: 149/184 (0.810), logp: -0.4160269349270088
-Without zero-info matchups: 134/164 (0.817), logp: -0.4024425452850531
-Only both-rated matchups: 81/91 (0.890), logp: -0.2982905408897432
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_glicko.csv -m E
-Finished counting run of 188 matchups between 129 players.
-Prediction accuracy: 145/188 (0.771), logp: -0.48401372686060395
-Without zero-info matchups: 125/159 (0.786), logp: -0.4571601232018844
-Only both-rated matchups: 70/88 (0.795), logp: -0.4406820007991066
-
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_labels.csv -m V
-Finished counting run of 184 matchups between 113 players.
-Prediction accuracy: 168/184 (0.913), logp: -0.2423652287258378
-Without zero-info matchups: 148/164 (0.902), logp: -0.24873488734633986
-Only both-rated matchups: 84/91 (0.923), logp: -0.2423886768546325
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_labels.csv -m E
-Finished counting run of 188 matchups between 129 players.
-Prediction accuracy: 170/188 (0.904), logp: -0.3048647427128579
-Without zero-info matchups: 142/159 (0.893), logp: -0.30956496863085564
-Only both-rated matchups: 78/88 (0.886), logp: -0.3447837063186587
-
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_stochastic.csv -m V
-Finished counting run of 184 matchups between 113 players.
-Prediction accuracy: 140/184 (0.761), logp: -0.6300356125237737
-Without zero-info matchups: 125/164 (0.762), logp: -0.6363558084603422
-Only both-rated matchups: 69/91 (0.758), logp: -0.5150010254228186
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_stochastic.csv -m E
-Finished counting run of 188 matchups between 129 players.
-Prediction accuracy: 140/188 (0.745), logp: -0.7668074661372509
-Without zero-info matchups: 123/159 (0.774), logp: -0.5682926075606708
-Only both-rated matchups: 70/88 (0.795), logp: -0.5144038836654211
-
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_pocmodel_t.csv -m T
-Finished counting run of 1480 matchups between 276 players.
-Prediction accuracy: 1000/1480 (0.676), logp: -0.642158980017116
-Without zero-info matchups: 987/1454 (0.679), logp: -0.6408356339015334
-Only both-rated matchups: 840/1230 (0.683), logp: -0.6393122992858223
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_pocmodel_v.csv -m V
-Finished counting run of 184 matchups between 113 players.
-Prediction accuracy: 145/184 (0.788), logp: -0.5028857933579487
-Without zero-info matchups: 130/164 (0.793), logp: -0.48796743898603473
-Only both-rated matchups: 81/91 (0.890), logp: -0.42956774269134734
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_pocmodel_e.csv -m E
-Finished counting run of 188 matchups between 129 players.
-Prediction accuracy: 131/188 (0.697), logp: -0.5609931036198857
-Without zero-info matchups: 111/159 (0.698), logp: -0.5680972446165763
-Only both-rated matchups: 60/88 (0.682), logp: -0.5716883356493521
-
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_labels.csv --fixed-prediction True
-Finished counting run of 1852 matchups between 295 players.
-Prediction accuracy: 970/1852 (0.524), logp: -0.6931471805599129
-Without zero-info matchups: 959/1830 (0.524), logp: -0.6931471805599132
-Only both-rated matchups: 813/1579 (0.515), logp: -0.6931471805599169
-
-
-
-======== OBSOLETE ========
-
-
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_strmodel.csv -m T
-Finished counting run of 1480 matchups between 276 players.
-Prediction accuracy: 782/1480 (0.528), logp: -0.701363753179138
-Without zero-info matchups: 770/1454 (0.530), logp: -0.7017607734489554
-Only both-rated matchups: 670/1230 (0.545), logp: -0.6917485666627046
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_strmodel.csv -m V
-Finished counting run of 184 matchups between 113 players.
-Prediction accuracy: 97/184 (0.527), logp: -0.7037027100713872
-Without zero-info matchups: 86/164 (0.524), logp: -0.7043695727249926
-Only both-rated matchups: 52/91 (0.571), logp: -0.6764219814842992
-user@Linux-Mint:~/thesis/win/go-strength-model$ python3 python/calc_performance.py csv/games_strmodel.csv -m E
-Finished counting run of 188 matchups between 129 players.
-Prediction accuracy: 87/188 (0.463), logp: -0.7552095478601216
-Without zero-info matchups: 72/159 (0.453), logp: -0.7584195895072016
-Only both-rated matchups: 42/88 (0.477), logp: -0.7237424291275653
+Evaluate games from /home/user/thesis/win/go-strength-model/csv7M/games_labels.csv marked 'T'
+Load precomputed pick features from /home/user/thesis/win/go-strength-model/featurecache
+Save results to /home/user/thesis/win/go-strength-model/csv7M/games_model_t.csv
+Device: cuda
+Evaluate games from /home/user/thesis/win/go-strength-model/csv7M/games_labels.csv marked 'V'
+Load precomputed pick features from /home/user/thesis/win/go-strength-model/featurecache
+Save results to /home/user/thesis/win/go-strength-model/csv7M/games_model_v.csv
+Device: cuda
+Evaluate games from /home/user/thesis/win/go-strength-model/csv7M/games_labels.csv marked 'E'
+Load precomputed pick features from /home/user/thesis/win/go-strength-model/featurecache
+Save results to /home/user/thesis/win/go-strength-model/csv7M/games_model_e.csv
+Device: cuda

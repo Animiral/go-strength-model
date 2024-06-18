@@ -11,7 +11,8 @@ def main(listpath, ratingspath, outputpath):
 
     fieldnames = listreader.fieldnames  # expect: ['File', 'Player White', 'Player Black', 'Score']
     # take these additional columns from the ratings file
-    ratingsfields = ['PredictedScore','BlackRating','BlackDeviation','BlackVolatility','WhiteRating','WhiteDeviation','WhiteVolatility']
+    ratingsfields = ['PredictedScore','PredictedBlackRating','PredictedWhiteRating',
+                     'BlackRating','BlackDeviation','BlackVolatility','WhiteRating','WhiteDeviation','WhiteVolatility']
     fieldnames += ratingsfields
     outputfile = open(outputpath, "w")
     writer = csv.DictWriter(outputfile, fieldnames)
