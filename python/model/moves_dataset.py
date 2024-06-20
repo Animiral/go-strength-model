@@ -95,20 +95,7 @@ class MovesDataset(Dataset):
 
         basePath, _ = os.path.splitext(game.sgfPath)
         featurePath = f"{self.featuredir}/{basePath}_{player}Recent.zip"
-
-        with zipfile.ZipFile(featurePath, "r") as z:
-            with z.open("turn.bin") as file:
-                file.seek(0, os.SEEK_END)
-                file_size = file.tell()
-                movecount = file_size // 4  # each turn index is a 32-bit int
-
-            if 0 == movecount:
-                return torch.empty(0, featureDims if featureDims > 0 else 0)
-
-            with z.open(f"{featurename}.bin") as file:
-                data = np.frombuffer(file.read(), dtype=np.float32)
-
-        return torch.tensor(data).reshape(movecount, featureDims)
+        return load_features_from_zip(featurePath, featureDims)
 
     def _findFeatureDims(self):
         """Discover feature dimensions by loading recent move data, assuming they are consistent."""
@@ -164,28 +151,20 @@ class MovesDataset(Dataset):
         self.players[white.name] = game  # set last occurrence
         return game
 
-    # def _loadFeatures(self, game: GameEntry):
-    #     """Load POC features"""
-    #     sgfPathWithoutExt, _ = os.path.splitext(game.sgfPath)
-    #     game.black.features = MovesDataset._readFeaturesFromFile(f"{self.featuredir}/{sgfPathWithoutExt}_BlackFeatures.bin");
-    #     game.white.features = MovesDataset._readFeaturesFromFile(f"{self.featuredir}/{sgfPathWithoutExt}_WhiteFeatures.bin");
+def load_features_from_zip(path: str, featureDims: int = -1):
+    with zipfile.ZipFile(path, "r") as z:
+        with z.open("turn.bin") as file:
+            file.seek(0, os.SEEK_END)
+            file_size = file.tell()
+            movecount = file_size // 4  # each turn index is a 32-bit int
 
-    # @staticmethod
-    # def _readFeaturesFromFile(path: str):
-    #     """Load POC features"""
-    #     FEATURE_HEADER = 0xfea70235  # feature file needs to start with this marker
-    #     featureDims = 6  # POC features
+        if 0 == movecount:
+            return torch.empty(0, featureDims if featureDims > 0 else 0)
 
-    #     with open(path, "rb") as file:
-    #         # Read and validate the header
-    #         header = np.fromfile(file, dtype=np.uint32, count=1)
-    #         if header.size == 0 or header[0] != FEATURE_HEADER:
-    #             raise IOError("Failed to read from feature file " + path)
+        with z.open(f"{featurename}.bin") as file:
+            data = np.frombuffer(file.read(), dtype=np.float32)
 
-    #         features_flat = np.fromfile(file, dtype=np.float32)
-
-    #     count = len(features_flat) // featureDims
-    #     return torch.from_numpy(features_flat).reshape(count, featureDims)
+    return torch.tensor(data).reshape(movecount, featureDims)
 
 def pad_collate_one(rs):
     lens = [r.shape[0] for r in rs]
