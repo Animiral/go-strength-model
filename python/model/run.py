@@ -29,6 +29,7 @@ def main(args):
     print(f"Device: {device}")
 
     with tempfile.NamedTemporaryFile(suffix='.zip') as outFile:
+        print(f"Feature file: {outFile.name}")
         print(f"Executing katago...")
         xs = katago(katapath, katamodel, kataconfig, sgfs, outFile.name, featurename, playername)
 
@@ -55,7 +56,7 @@ def katago(binPath: str, modelPath: str, configPath: str, sgfFiles: list[str], o
         if process.returncode != 0:
             raise RuntimeError(f"KataGo execution failed with return code {process.returncode}.")
 
-    return load_features_from_zip(outFile)
+    return load_features_from_zip(outFile, featureName)
 
 def evaluate(xs: torch.Tensor, model: StrengthNet):
     model.eval()

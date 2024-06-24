@@ -85,17 +85,17 @@ class MovesDataset(Dataset):
                 }
                 writer.writerow(row)
 
-    def loadRecentMoves(self, player: str, game: GameEntry, featurename: str = ""):
+    def loadRecentMoves(self, player: str, game: GameEntry, featureName: str = ""):
         assert player in {"Black", "White"}
-        if "" == featurename:
-            featurename = self.featurename  # default
+        if "" == featureName:
+            featureName = self.featureName  # default
             featureDims = self.featureDims  # known/detected by _findFeatureDims
         else:
             featureDims = -1  # guess
 
         basePath, _ = os.path.splitext(game.sgfPath)
         featurePath = f"{self.featuredir}/{basePath}_{player}Recent.zip"
-        return load_features_from_zip(featurePath, featureDims)
+        return load_features_from_zip(featurePath, featureName, featureDims)
 
     def _findFeatureDims(self):
         """Discover feature dimensions by loading recent move data, assuming they are consistent."""
@@ -151,7 +151,7 @@ class MovesDataset(Dataset):
         self.players[white.name] = game  # set last occurrence
         return game
 
-def load_features_from_zip(path: str, featureDims: int = -1):
+def load_features_from_zip(path: str, featureName: str, featureDims: int = -1):
     with zipfile.ZipFile(path, "r") as z:
         with z.open("turn.bin") as file:
             file.seek(0, os.SEEK_END)
@@ -161,7 +161,7 @@ def load_features_from_zip(path: str, featureDims: int = -1):
         if 0 == movecount:
             return torch.empty(0, featureDims if featureDims > 0 else 0)
 
-        with z.open(f"{featurename}.bin") as file:
+        with z.open(f"{featureName}.bin") as file:
             data = np.frombuffer(file.read(), dtype=np.float32)
 
     return torch.tensor(data).reshape(movecount, featureDims)

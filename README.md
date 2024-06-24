@@ -17,20 +17,26 @@ The following external dependencies are required:
   - my [fork of the goratings repository](https://github.com/Animiral/goratings), originally [here](https://github.com/online-go/goratings)
   - a dataset to work on, like the [OGS 2021 collection](https://archive.org/details/ogs2021)
 
-# Estimate Playing Strength (obsolete! to be reworked)
+# Estimate Playing Strength
 
-Using the modified KataGo and a strength model file, we can let the program estimate a player's Glicko rating.
-The strength model file can be obtained, for example, by following the further steps in this README to train it on an existing game dataset.
-In addition to that model file, we only need to pass it a set of SGF files and a player name.
+Using the modified KataGo and a strength model weights file, we can estimate a player's Glicko rating.
+The strength model weights file can be obtained, for example, by following the further steps in this README to train it on an existing game dataset.
+
+The strength model is implemented in Python using PyTorch, but it requires the modified katago binary to extract move features from the SGFs.
+To pass all the required and optional arguments, follow this script.
 
 ```
+$ SGF=path/to/games/*.sgf
 $ KATAGO=path/to/katago/cpp/katago
-$ CONFIG=path/to/katago/cpp/configs/analysis_example.cfg
-$ MODEL=path/to/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
-$ STRENGTH_MODEL=$KATADIR/models/strength-model.bin
-$ PLAYER=playername
-$ SGF=sgf/game1.sgf sgf/game2.sgf sgf/game3.sgf
-$ $KATAGO strength_analysis -config $CONFIG -model $MODEL -strengthmodel $STRENGTH_MODEL -player $PLAYER $SGF
+$ KATAMODEL=path/to/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
+$ KATACONFIG=path/to/katago/cpp/configs/analysis_example.cfg
+$ STRMODEL=path/to/weights/file.pth
+$ FEATURENAME=pick  # or trunk, or head, if compatible with model
+$ PLAYERNAMEARG=--playername \"My Name\"  # needs to match player name in SGFs, leave blank to auto
+#$ PLAYERNAMEARG=   # uncomment this to auto-detect name
+
+python3 python/model/run.py $SGF --katago $KATAGO --katamodel $KATAMODEL --kataconfig $KATACONFIG \
+    --model $STRMODEL --featurename $FEATURENAME $PLAYERNAMEARG
 ```
 
 # Dataset Preparation
@@ -392,7 +398,23 @@ $ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker V
 $ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker E
 ```
 
-## Move Feature Precomputation for Proof of Concept Model
+## Estimate Playing Strength using the C++ Model (obsolete)
+
+Using the modified KataGo and a strength model file, we can let the program estimate a player's Glicko rating.
+The strength model file can be obtained, for example, by following the further steps in this README to train it on an existing game dataset.
+In addition to that model file, we only need to pass it a set of SGF files and a player name.
+
+```
+$ KATAGO=path/to/katago/cpp/katago
+$ CONFIG=path/to/katago/cpp/configs/analysis_example.cfg
+$ MODEL=path/to/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
+$ STRENGTH_MODEL=$KATADIR/models/strength-model.bin
+$ PLAYER=playername
+$ SGF=sgf/game1.sgf sgf/game2.sgf sgf/game3.sgf
+$ $KATAGO strength_analysis -config $CONFIG -model $MODEL -strengthmodel $STRENGTH_MODEL -player $PLAYER $SGF
+```
+
+## Move Feature Precomputation for Proof of Concept Model (obsolete version)
 
 This smaller strength model uses just six features for each move computed from the outputs of the KataGo search engine. These are winrate after move, points lead after move, move policy, max policy on board, winrate loss and points loss. Here the KataGo network is static for us, so it saves time to do this expensive precomputation just once before training the strength model. Launch the command to precompute all features for every game in a list file and write them to feature files in a dedicated directory as follows:
 
