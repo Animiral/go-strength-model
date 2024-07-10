@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# Apply the strength model on one or multiple SGF files, including KataGo preprocessing.
+
 import argparse
 import subprocess
 import sys

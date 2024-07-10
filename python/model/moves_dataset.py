@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# MovesDataset and MovesDataLoader allows the model to load train/val/test data.
+
 from __future__ import annotations
 import os
 from os.path import exists
@@ -51,7 +54,7 @@ class MovesDataset(Dataset):
             self.games = [self._makeGameEntry(r) for r in reader if (not sparse) or marker == r["Set"]]
 
         self.marked = [g for g in self.games if g.marker == marker]
-        self.featurename = featurename  # used to select correct feature data from ZIP
+        self.featureName = featurename  # used to select correct feature data from ZIP
         self.featureDims = self._findFeatureDims()
 
     def __len__(self):

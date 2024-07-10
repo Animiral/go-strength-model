@@ -1,10 +1,13 @@
+#!/usr/bin/env python3
+# Our model training algorithm.
+
 import argparse
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, RandomSampler, BatchSampler
 from moves_dataset import MovesDataset, MovesDataLoader
 from strengthnet import StrengthNet
-from torch.nn.utils.rnn import pack_padded_sequence
+from torch.optim.lr_scheduler import StepLR
 
 device = "cuda"
 
@@ -18,6 +21,8 @@ def main(args):
     batch_size = args["batch_size"]
     steps = args["steps"]
     epochs = args["epochs"]
+    learningrate = args["learningrate"]
+    lrdecay = args["lrdecay"]
 
     print(f"Load training data from {listfile}")
     print(f"Load precomputed {featurename} features from {featuredir}")
@@ -38,8 +43,9 @@ def main(args):
     test_data = MovesDataset(listfile, featuredir, 'V', featurename=featurename)
     test_loader = MovesDataLoader(test_data, batch_size=batch_size)
 
-    model = StrengthNet(train_data.featureDims).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    model = newmodel(train_data.featureDims, args).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=float(learningrate))
+    scheduler = StepLR(optimizer, step_size=1, gamma=1/float(lrdecay))
 
     if outfile:
         outpath = outfile.replace('{}', "0")
@@ -59,6 +65,8 @@ def main(args):
         if testlossfile:
             testlossfile.write(f"{testloss}\n")
 
+        scheduler.step()  # decay learning rate
+
         if outfile:
             outpath = outfile.replace('{}', str(e+1))
             torch.save(model.state_dict(), outpath)
@@ -66,6 +74,13 @@ def main(args):
     trainlossfile and trainlossfile.close()
     testlossfile and testlossfile.close()
     print("Done!")
+
+def newmodel(featureDims: int, args):
+    depth = args.get("modeldepth", 2)
+    hiddenDims = args.get("hidden_dims", 16)
+    queryDims = args.get("query_dims", 8)
+    inducingPoints = args.get("inducing_points", 8)
+    return StrengthNet(featureDims, depth, hiddenDims, queryDims, inducingPoints)
 
 def train(loader, model, optimizer, totalsize: int=0):
     samples = 0  # how many we have learned
@@ -128,6 +143,8 @@ if __name__ == "__main__":
     optional_args.add_argument('-b', '--batch-size', help='Minibatch size', type=int, default=100, required=False)
     optional_args.add_argument('-t', '--steps', help='Number of batches per epoch', type=int, default=100, required=False)
     optional_args.add_argument('-e', '--epochs', help='Nr of training epochs', type=int, default=5, required=False)
+    optional_args.add_argument('-l', '--learningrate', help='Initial gradient scale', type=float, default=1e-3, required=False)
+    optional_args.add_argument('-d', '--lrdecay', help='Leraning rate decay', type=float, default=0.95, required=False)
     optional_args.add_argument('--trainlossfile', help='Output file to store training loss values', type=str, required=False)
     optional_args.add_argument('--testlossfile', help='Output file to store validation loss values', type=str, required=False)
 

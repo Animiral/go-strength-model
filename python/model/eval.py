@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# Evaluate strength model on marked games in dataset.
+
 import argparse
 import torch
 from moves_dataset import MovesDataset
