@@ -32,7 +32,7 @@ $ KATAMODEL=path/to/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.g
 $ KATACONFIG=path/to/katago/cpp/configs/analysis_example.cfg
 $ STRMODEL=path/to/weights/file.pth
 $ FEATURENAME=pick  # or trunk, or head, if compatible with model
-$ PLAYERNAMEARG=--playername \"My Name\"  # needs to match player name in SGFs, leave blank to auto
+$ PLAYERNAMEARG=--playername \"My Name\"  # needs to match player name in SGFs
 #$ PLAYERNAMEARG=   # uncomment this to auto-detect name
 
 python3 python/model/run.py $SGF --katago $KATAGO --katamodel $KATAMODEL --kataconfig $KATACONFIG \
