@@ -29,9 +29,9 @@ def rankstr(rank):
     return f'{dan}-dan'
 
 def read_csv(path):
-  df = pd.read_csv(path, usecols=['Player White', 'Player Black', 'PredictedWhiteRating', 'PredictedBlackRating'])
-  df_white = df[['Player White', 'PredictedWhiteRating']].rename(columns={'Player White': 'Player', 'PredictedWhiteRating': 'Rating'})
-  df_black = df[['Player Black', 'PredictedBlackRating']].rename(columns={'Player Black': 'Player', 'PredictedBlackRating': 'Rating'})
+  df = pd.read_csv(path, usecols=['Player White', 'Player Black', 'WhiteRating', 'BlackRating'])
+  df_white = df[['Player White', 'WhiteRating']].rename(columns={'Player White': 'Player', 'WhiteRating': 'Rating'})
+  df_black = df[['Player Black', 'BlackRating']].rename(columns={'Player Black': 'Player', 'BlackRating': 'Rating'})
   df = pd.concat([df_white, df_black])
   df = df.drop_duplicates(subset=['Player'], keep='last')
   df.sort_values('Rating', inplace=True)
@@ -42,37 +42,6 @@ def read_csv(path):
   y = density(x)
 
   return x, y
-  # print(df_final_ratings)
-
-  # low_data = df[df['rating'] < config['low_rating']]['loss']
-  # medium_data = df[(df['rating'] >= config['low_rating']) & (df['rating'] <= config['high_rating'])]['loss']
-  # high_data = df[df['rating'] > config['high_rating']]['loss']
-
-  # # left extra bar
-  # gains_rows = df['loss'] < config['gains_level']
-  # gains = { 'low': len(low_data[gains_rows]) / len(low_data),
-  #           'medium': len(medium_data[gains_rows]) / len(medium_data),
-  #           'high': len(high_data[gains_rows]) / len(high_data) }
-
-  # # right extra bar
-  # blunders_rows = df['loss'] > config['blunders_level']
-  # blunders = { 'low': len(low_data[blunders_rows]) / len(low_data),
-  #              'medium': len(medium_data[blunders_rows]) / len(medium_data),
-  #              'high': len(high_data[blunders_rows]) / len(high_data) }
-
-  # density = gaussian_kde(df['loss'])
-  # low_density = gaussian_kde(low_data)
-  # medium_density = gaussian_kde(medium_data)
-  # high_density = gaussian_kde(high_data)
-  # x = np.linspace(-2, 15, 100)
-  # # x = np.linspace(df['loss'].min(), df['loss'].max(), 1000)
-  # y = density(x)
-  # low_y = low_density(x)
-  # medium_y = medium_density(x)
-  # high_y = high_density(x)
-  # # gains = dict(low: gains_low, medium: gains_medium, high: gains_high)
-  # # blunders = dict(low: blunders_low, medium: blunders_medium, high: blunders_high)
-  # return x, y, low_y, medium_y, high_y, gains, blunders
 
 def plot(x, y):
   low_color = '#FFB6C1'  # pink

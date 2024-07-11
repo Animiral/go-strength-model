@@ -45,8 +45,10 @@ $ python3 plots/wrloss_rating.py csv/data-wrloss.csv
 
 # Glicko-2 Confidence
 
-This plot shows how the rating deviation develops over time in our reference Glicko-2 evaluation.
+This script creates two plots to show the progression of ratings under Glicko-2 after a certain number of games.
 It sources its data from the result as described in the main README, Section “Glicko-2 Calculation”.
+
+The first plot shows how the rating *deviation* develops over games. The second plot shows histograms of the rating distribution over games.
 
 ```
 $ python3 plots/deviation.py csv/games_glicko.csv
