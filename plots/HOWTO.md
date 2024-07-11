@@ -53,3 +53,15 @@ The first plot shows how the rating *deviation* develops over games. The second 
 ```
 $ python3 plots/deviation.py csv/games_glicko.csv
 ```
+
+# Model vs Label
+
+This script creates plots which illustrate the estimates produced by our models compared with the labels on the games.
+It sources its data from the result as described in the main README. The input CSV file needs to have the columns "BlackRating", "PredictedBlackRating", "WhiteRating", "PredictedWhiteRating", "Score" and "PredictedScore".
+
+The second parameter to the script just gives it a model name to use in the figure title.
+
+
+```
+$ python3 plots/estimate_vs_label.py csv/games_glicko.csv Glicko-2
+```
