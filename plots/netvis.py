@@ -6,6 +6,7 @@ Visualize the neural network model layers: activations and gradients.
 
 import argparse
 import torch
+from torch import nn
 import matplotlib.pyplot as plt
 from model.moves_dataset import MovesDataset, MovesDataLoader
 from model.strengthnet import StrengthNet
@@ -19,9 +20,13 @@ def main(listpath, featurepath, featurename, netpath, index):
   if netpath:
     model.load_state_dict(torch.load(netpath)).to(device)
 
-  bx, _, _, _, _ = data[index]
-  bx = bx.to(device)
-  bpred = model(bx).item()
+  bx, wx, by, wy, s = data[index]  # blackRecent, whiteRecent, game.black.rating, game.white.rating, game.score
+  print(f"Game {index}: {len(bx)} black recent, {len(wx)} white recent, by={by}, wy={wy}, s={s}")
+  bx, by = bx.to(device), torch.tensor(by).to(device)
+  bpred = model(bx)
+  MSE = nn.MSELoss()
+  loss = MSE(bpred, by)
+  loss.backward()
   a_acts, h_acts = model.activations()
 
   for l, act in enumerate(a_acts):
@@ -38,9 +43,31 @@ def main(listpath, featurepath, featurename, netpath, index):
     hy, hx = torch.histogram(act, density=True)
     plt.plot(hx[:-1].detach(), hy.detach(), label=f"Layer {l}")
 
-  # plt.xticks([])
   plt.ylabel('Density')
   plt.title('ReLu Preactivations')
+  plt.legend()
+  plt.show()
+
+  parameters = model.parameters()
+  print(f"Parameters: {sum(p.nelement() for p in parameters)}") # number of parameters in total
+
+  a_grads, h_grads = model.grads()
+
+  for l, grad in enumerate(a_grads):
+    hy, hx = torch.histogram(grad, density=True)
+    plt.plot(hx[:-1].detach(), hy.detach(), label=f"Layer {l}")
+
+  plt.ylabel('Density')
+  plt.title('Softmax Grads')
+  plt.legend()
+  plt.show()
+
+  for l, grad in enumerate(h_grads):
+    hy, hx = torch.histogram(grad, density=True)
+    plt.plot(hx[:-1].detach(), hy.detach(), label=f"Layer {l}")
+
+  plt.ylabel('Density')
+  plt.title('ReLu Grads')
   plt.legend()
   plt.show()
 

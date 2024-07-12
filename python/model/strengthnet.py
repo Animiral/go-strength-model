@@ -38,6 +38,19 @@ class StrengthNet(nn.Module):
                 h_acts.append(hres)
         return a_acts, h_acts
 
+    def grads(self):
+        """Get some relevant gradients for introspection (of the activations)"""
+        a_grads = []
+        h_grads = []
+        for layer in self.enc.layers:
+            if isinstance(layer, ISAB):
+                a = torch.cat((layer.ab0.a.grad.flatten(), layer.ab1.a.grad.flatten()))
+                a_grads.append(a)
+                hres = torch.cat((layer.ab0.hres.grad.flatten(), layer.ab1.hres.grad.flatten()))
+                h_grads.append(hres)
+        return a_grads, h_grads
+
+
 class Sequential(nn.Module):
     """Like nn.Sequential, but passes xlens (collated minibatch structure) where necessary"""
     def __init__(self, *layers):
@@ -74,6 +87,10 @@ class AttentionBlock(nn.Module):
         h = self.norm0(q + torch.matmul(self.a, v))
         self.hres = self.fc(h)  # store preactivations for introspection
         h = self.norm1(h + torch.relu(self.hres))
+
+        self.a.retain_grad()
+        self.hres.retain_grad()
+
         return h
 
 class ISAB(nn.Module):

@@ -82,26 +82,29 @@ def newmodel(featureDims: int, args):
     inducingPoints = args.get("inducing_points", 8)
     return StrengthNet(featureDims, depth, hiddenDims, queryDims, inducingPoints)
 
+def loss(bpred, wpred, by, wy, score):
+    MSE = nn.MSELoss()
+    return MSE(bpred, by) + MSE(wpred, wy) # + crossentropy(bt(bpred, wpred), score)
+
 def train(loader, model, optimizer, totalsize: int=0):
     samples = 0  # how many we have learned
     model.train()
-    MSE = nn.MSELoss()
     trainloss = []
 
     for batchnr, (bx, wx, blens, wlens, by, wy, score) in enumerate(loader):
         bx, by, wx, wy = map(lambda t: t.to(device), (bx, by, wx, wy))
         bpred, wpred = model(bx, blens), model(wx, wlens)
-        loss = MSE(bpred, by) + MSE(wpred, wy) # + crossentropy(bt(bpred, wpred), score)
-        loss.backward()
+        l = loss(bpred, wpred, by, wy, score)
+        l.backward()
         optimizer.step()
         optimizer.zero_grad()
 
         # status
         batch_size = len(score)
-        loss = loss.item() / batch_size
-        trainloss.append(loss)
+        l = l.item() / batch_size
+        trainloss.append(l)
         samples += batch_size
-        print(f"loss: {loss:>7f}  [{samples:>5d}/{totalsize:>5d}]")
+        print(f"loss: {l:>7f}  [{samples:>5d}/{totalsize:>5d}]")
 
     return trainloss
 
