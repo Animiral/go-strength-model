@@ -61,7 +61,18 @@ It sources its data from the result as described in the main README. The input C
 
 The second parameter to the script just gives it a model name to use in the figure title.
 
-
 ```
 $ python3 plots/estimate_vs_label.py csv/games_glicko.csv Glicko-2
 ```
+
+# Neural Network Visualization
+
+These are plots of the strength model network's activations and gradients.
+
+```
+$ PYTHONPATH=python python3 plots/netvis.py csv/games_labels.csv featurecache --net nets/model.pth --index 10 --featurename pick
+```
+
+If the `--net` parameter is unspecified, the net will be randomly initialized.
+The optional `--index` parameter indicates which item from the training set should be passed through the network (always black recent moves). If unspecified, the first item is used by default.
+The optional `--featurename` parameter indicates which feature type from the dataset should be used (`trunk`, `pick` or `head`).

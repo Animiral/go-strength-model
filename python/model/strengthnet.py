@@ -26,6 +26,18 @@ class StrengthNet(nn.Module):
     def forward(self, x, xlens = None):
         return self.dec(self.enc(x, xlens), xlens).squeeze(-1)
 
+    def activations(self):
+        """Get flat values by layer from last forward pass for introspection"""
+        a_acts = []
+        h_acts = []
+        for layer in self.enc.layers:
+            if isinstance(layer, ISAB):
+                a = torch.cat((layer.ab0.a.flatten(), layer.ab1.a.flatten()))
+                a_acts.append(a)
+                hres = torch.cat((layer.ab0.hres.flatten(), layer.ab1.hres.flatten()))
+                h_acts.append(hres)
+        return a_acts, h_acts
+
 class Sequential(nn.Module):
     """Like nn.Sequential, but passes xlens (collated minibatch structure) where necessary"""
     def __init__(self, *layers):
@@ -49,9 +61,7 @@ class AttentionBlock(nn.Module):
         self.WQ = nn.Linear(hiddenDims, queryDims, bias=False)
         self.WK = nn.Linear(hiddenDims, queryDims, bias=False)
         self.WV = nn.Linear(hiddenDims, hiddenDims, bias=False)
-        self.fc = nn.Sequential(
-            nn.Linear(hiddenDims, hiddenDims, bias=True),
-            nn.ReLU())
+        self.fc = nn.Linear(hiddenDims, hiddenDims, bias=True)
         self.norm0 = nn.LayerNorm(hiddenDims)
         self.norm1 = nn.LayerNorm(hiddenDims)
 
@@ -60,9 +70,10 @@ class AttentionBlock(nn.Module):
         k, v = self.WK(h), self.WV(h)
 
         a = torch.matmul(qq, k.transpose(-2, -1)) / self.z
-        a = torch.softmax(a, dim=-1)
-        h = self.norm0(q + torch.matmul(a, v))
-        h = self.norm1(h + self.fc(h))
+        self.a = torch.softmax(a, dim=-1)  # store activations for introspection
+        h = self.norm0(q + torch.matmul(self.a, v))
+        self.hres = self.fc(h)  # store preactivations for introspection
+        h = self.norm1(h + torch.relu(self.hres))
         return h
 
 class ISAB(nn.Module):

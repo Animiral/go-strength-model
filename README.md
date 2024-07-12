@@ -266,7 +266,7 @@ After successful completion, check the result using `checkdataset.py` found in t
 ```
 $ LIST=csv/games_labels.csv
 $ FEATUREDIR=path/to/featurecache
-$ SELECTION="-require-trunk -require-pick -require-head"  # features to check
+$ SELECTION="--require-trunk --require-pick --require-head"  # features to check
 $ python3 python/checkdataset.py $LIST $FEATUREDIR $SELECTION
 ```
 
