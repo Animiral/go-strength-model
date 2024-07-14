@@ -27,6 +27,11 @@ def main(listpath, featurepath, featurename, netpath, index):
   MSE = nn.MSELoss()
   loss = MSE(bpred, by)
   loss.backward()
+
+  plot_activations(model)
+  plot_gradients(model)
+
+def plot_activations(model):
   a_acts, h_acts = model.activations()
 
   for l, act in enumerate(a_acts):
@@ -48,6 +53,7 @@ def main(listpath, featurepath, featurename, netpath, index):
   plt.legend()
   plt.show()
 
+def plot_gradients(model):
   parameters = model.parameters()
   print(f"Parameters: {sum(p.nelement() for p in parameters)}") # number of parameters in total
 
