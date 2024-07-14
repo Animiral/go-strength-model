@@ -38,6 +38,15 @@ class StrengthNet(nn.Module):
                 h_acts.append(hres)
         return a_acts, h_acts
 
+    def retain_grads(self):
+        """Between forward and backward pass, ensure that relevant layers retain gradients for introspection."""
+        for layer in self.enc.layers:
+            if isinstance(layer, ISAB):
+                layer.ab0.a.retain_grad()
+                layer.ab0.hres.retain_grad()
+                layer.ab1.a.retain_grad()
+                layer.ab1.hres.retain_grad()
+
     def grads(self):
         """Get some relevant gradients for introspection (of the activations)"""
         a_grads = []
@@ -87,9 +96,6 @@ class AttentionBlock(nn.Module):
         h = self.norm0(q + torch.matmul(self.a, v))
         self.hres = self.fc(h)  # store preactivations for introspection
         h = self.norm1(h + torch.relu(self.hres))
-
-        self.a.retain_grad()
-        self.hres.retain_grad()
 
         return h
 

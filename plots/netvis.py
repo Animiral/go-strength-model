@@ -2,11 +2,13 @@
 # Usage: plots/netvis.py csv/games_labels.csv featurecache --net nets/model.pth --index 10 --featurename pick
 """
 Visualize the neural network model layers: activations and gradients.
+Visualize the neural network model outputs over the training set vs labels.
 """
 
 import argparse
 import torch
 from torch import nn
+import numpy as np
 import matplotlib.pyplot as plt
 from model.moves_dataset import MovesDataset, MovesDataLoader
 from model.strengthnet import StrengthNet
@@ -24,12 +26,14 @@ def main(listpath, featurepath, featurename, netpath, index):
   print(f"Game {index}: {len(bx)} black recent, {len(wx)} white recent, by={by}, wy={wy}, s={s}")
   bx, by = bx.to(device), torch.tensor(by).to(device)
   bpred = model(bx)
+  model.retain_grads()
   MSE = nn.MSELoss()
   loss = MSE(bpred, by)
   loss.backward()
 
   plot_activations(model)
   plot_gradients(model)
+  plot_outputs(data, model)
 
 def plot_activations(model):
   a_acts, h_acts = model.activations()
@@ -39,8 +43,8 @@ def plot_activations(model):
     plt.plot(hx[:-1].detach(), hy.detach(), label=f"Layer {l}")
 
   plt.ylim(0, 50)
-  plt.ylabel('Density')
-  plt.title('Softmax Activations')
+  plt.ylabel("Density")
+  plt.title("Softmax Activations")
   plt.legend()
   plt.show()
 
@@ -48,8 +52,8 @@ def plot_activations(model):
     hy, hx = torch.histogram(act, density=True)
     plt.plot(hx[:-1].detach(), hy.detach(), label=f"Layer {l}")
 
-  plt.ylabel('Density')
-  plt.title('ReLu Preactivations')
+  plt.ylabel("Density")
+  plt.title("ReLu Preactivations")
   plt.legend()
   plt.show()
 
@@ -63,8 +67,8 @@ def plot_gradients(model):
     hy, hx = torch.histogram(grad, density=True)
     plt.plot(hx[:-1].detach(), hy.detach(), label=f"Layer {l}")
 
-  plt.ylabel('Density')
-  plt.title('Softmax Grads')
+  plt.ylabel("Density")
+  plt.title("Softmax Grads")
   plt.legend()
   plt.show()
 
@@ -72,8 +76,38 @@ def plot_gradients(model):
     hy, hx = torch.histogram(grad, density=True)
     plt.plot(hx[:-1].detach(), hy.detach(), label=f"Layer {l}")
 
-  plt.ylabel('Density')
-  plt.title('ReLu Grads')
+  plt.ylabel("Density")
+  plt.title("ReLu Grads")
+  plt.legend()
+  plt.show()
+
+def plot_outputs(data, model):
+  outs = []
+  labels = []
+  progress = 0
+  print(f"Evaluate training set of size {len(data)}")
+
+  model.eval()
+  for (bx, wx, by, wy, s) in data:  # blackRecent, whiteRecent, game.black.rating, game.white.rating, game.score
+    print(".", end="", flush=True)
+    with torch.no_grad():
+      outs.append(model(bx.to(device)).item())
+      labels.append(by)
+      outs.append(model(wx.to(device)).item())
+      labels.append(wy)
+    progress += 1
+    # if progress > 20:
+      # break  # temp
+
+  print(f"Labels mean: {np.mean(labels)} stdev: {np.std(labels)}")
+
+  hy, hx = np.histogram(outs, bins='auto', density=True)
+  plt.plot(hx[:-1], hy, label=f"Model Output")
+  hy, hx = np.histogram(labels, bins="auto", density=True)
+  plt.plot(hx[:-1], hy, label=f"Training Labels")
+
+  plt.ylabel("Density")
+  plt.title("Output Distribution")
   plt.legend()
   plt.show()
 

@@ -43,6 +43,8 @@ class GameEntry:
 class MovesDataset(Dataset):
     """Load the dataset from a CSV list file"""
 
+    GLICKO2_SCALE = 173.7178
+
     def __init__(self, listpath: str, featuredir: str, marker: str, *,
       featurename: str = "pick", sparse: bool = True):
         self.featuredir = featuredir
@@ -65,7 +67,10 @@ class MovesDataset(Dataset):
         game = self.marked[idx]
         blackRecent = self.loadRecentMoves("Black", game)
         whiteRecent = self.loadRecentMoves("White", game)
-        return (blackRecent, whiteRecent, game.black.rating, game.white.rating, game.score)
+        # renorm labels into NN output range ~ N(0, 1)
+        mu = 1575.6314189190516
+        scale = MovesDataset.GLICKO2_SCALE * 1.7766241921153325
+        return (blackRecent, whiteRecent, (game.black.rating-mu)/scale, (game.white.rating-mu)/scale, game.score)
 
     def write(self, outpath: str):
         """Write to CSV file including predictions data where applicable"""
