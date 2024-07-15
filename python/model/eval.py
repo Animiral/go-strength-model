@@ -3,7 +3,7 @@
 
 import argparse
 import torch
-from moves_dataset import MovesDataset
+from moves_dataset import MovesDataset, scale_rating
 from strengthnet import StrengthNet
 
 device = "cuda"
@@ -27,8 +27,8 @@ def main(args):
 
     for i, game in enumerate(data.marked):
         bpred, wpred, spred = evaluate(data, i, model)
-        game.black.predictedRating = bpred
-        game.white.predictedRating = wpred
+        game.black.predictedRating = scale_rating(bpred)
+        game.white.predictedRating = scale_rating(wpred)
         game.predictedScore = spred
 
     data.write(outfile)

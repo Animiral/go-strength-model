@@ -43,7 +43,9 @@ class GameEntry:
 class MovesDataset(Dataset):
     """Load the dataset from a CSV list file"""
 
-    GLICKO2_SCALE = 173.7178
+    GLICKO2_SCALE = 173.7178   # from goratings Glicko-2 implementation
+    GLICKO2_MEAN = 1575.6314189190516   # empirical mean of training set
+    GLICKO2_STDEV = GLICKO2_SCALE * 1.7766241921153325   # empirical stdev of training set
 
     def __init__(self, listpath: str, featuredir: str, marker: str, *,
       featurename: str = "pick", sparse: bool = True):
@@ -68,8 +70,8 @@ class MovesDataset(Dataset):
         blackRecent = self.loadRecentMoves("Black", game)
         whiteRecent = self.loadRecentMoves("White", game)
         # renorm labels into NN output range ~ N(0, 1)
-        mu = 1575.6314189190516
-        scale = MovesDataset.GLICKO2_SCALE * 1.7766241921153325
+        mu = MovesDataset.GLICKO2_MEAN
+        scale = MovesDataset.GLICKO2_STDEV
         return (blackRecent, whiteRecent, (game.black.rating-mu)/scale, (game.white.rating-mu)/scale, game.score)
 
     def write(self, outpath: str):
@@ -192,7 +194,14 @@ class MovesDataLoader(DataLoader):
         kwargs["collate_fn"] = pad_collate
         super().__init__(*args, **kwargs)
 
+def bradley_terry_score(black_rating, white_rating):
+    """Estimate the match score between two ratings determined by model output (same scale as labels)"""
+    scale = MovesDataset.GLICKO2_STDEV
+    return 1 / (1 + (10 ** ((white_rating - black_rating) * scale / 400)))
 
+def scale_rating(rating):
+    """Convert a rating from label scale to Glicko-2 scale"""
+    return rating * MovesDataset.GLICKO2_STDEV + MovesDataset.GLICKO2_MEAN
 
 # Test/debug code (run module as standalone)
 

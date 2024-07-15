@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tempfile
 import torch
-from moves_dataset import load_features_from_zip
+from moves_dataset import load_features_from_zip, scale_rating
 from strengthnet import StrengthNet
 
 device = "cuda"
@@ -38,11 +38,19 @@ def main(args):
 
     print(f"Executing strength model...")
     featureDims = xs.shape[1]
-    model = StrengthNet(featureDims).to(device)
+    model = newmodel(featureDims, args).to(device)
     model.load_state_dict(torch.load(modelfile))
     pred = evaluate(xs, model)
+    pred = scale_rating(pred)
 
     print(f"The estimated rating of {playername} is {pred}.")
+
+def newmodel(featureDims: int, args):
+    depth = args.get("modeldepth", 2)
+    hiddenDims = args.get("hidden_dims", 16)
+    queryDims = args.get("query_dims", 8)
+    inducingPoints = args.get("inducing_points", 8)
+    return StrengthNet(featureDims, depth, hiddenDims, queryDims, inducingPoints)
 
 def katago(binPath: str, modelPath: str, configPath: str, sgfFiles: list[str], outFile: str, featureName: str, playerName: str) -> torch.Tensor:
     selection = f"-with-{featureName}"

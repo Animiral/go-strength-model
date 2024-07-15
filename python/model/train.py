@@ -2,10 +2,11 @@
 # Our model training algorithm.
 
 import argparse
+import math
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, RandomSampler, BatchSampler
-from moves_dataset import MovesDataset, MovesDataLoader
+from moves_dataset import MovesDataset, MovesDataLoader, bradley_terry_score
 from strengthnet import StrengthNet
 from torch.optim.lr_scheduler import StepLR
 
@@ -82,9 +83,15 @@ def newmodel(featureDims: int, args):
     inducingPoints = args.get("inducing_points", 8)
     return StrengthNet(featureDims, depth, hiddenDims, queryDims, inducingPoints)
 
-def loss(bpred, wpred, by, wy, score):
+def loss(bpred, wpred, by, wy, score, tau=None):
+    if tau is None:
+        # default: being off by 200 Glicko-2 points in both bpred and wpred is
+        # as bad as getting the score half wrong.
+        tau = 2*(200/MovesDataset.GLICKO2_STDEV)**2 / -math.log(.5)
     MSE = nn.MSELoss()
-    return MSE(bpred, by) + MSE(wpred, wy) # + crossentropy(bt(bpred, wpred), score)
+    rating_loss = MSE(bpred, by) + MSE(wpred, wy)
+    score_loss = -(1 - (score - bradley_terry_score(bpred, wpred)).abs_()).log_().sum()
+    return rating_loss + tau * score_loss
 
 def train(loader, model, optimizer, totalsize: int=0):
     samples = 0  # how many we have learned
@@ -92,7 +99,7 @@ def train(loader, model, optimizer, totalsize: int=0):
     trainloss = []
 
     for batchnr, (bx, wx, blens, wlens, by, wy, score) in enumerate(loader):
-        bx, by, wx, wy = map(lambda t: t.to(device), (bx, by, wx, wy))
+        bx, by, wx, wy, score = map(lambda t: t.to(device), (bx, by, wx, wy, score))
         bpred, wpred = model(bx, blens), model(wx, wlens)
         l = loss(bpred, wpred, by, wy, score)
         l.backward()
@@ -111,14 +118,13 @@ def train(loader, model, optimizer, totalsize: int=0):
 def test(loader, model):
     batches = len(loader)
     model.eval()
-    MSE = nn.MSELoss()
 
     test_loss, correct = 0, 0
     with torch.no_grad():
         for bx, wx, blens, wlens, by, wy, score in loader:
-            bx, by, wx, wy = map(lambda t: t.to(device), (bx, by, wx, wy))
+            bx, by, wx, wy, score = map(lambda t: t.to(device), (bx, by, wx, wy, score))
             bpred, wpred = model(bx, blens), model(wx, wlens)
-            loss = MSE(bpred, by) + MSE(wpred, wy)
+            l = loss(bpred, wpred, by, wy, score)
             test_loss += loss.item()
     test_loss /= batches
     print(f"Validation Error: \n Avg loss: {test_loss:>8f} \n")
