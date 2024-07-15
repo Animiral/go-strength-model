@@ -26,6 +26,10 @@ class StrengthNet(nn.Module):
     def forward(self, x, xlens = None):
         return self.dec(self.enc(x, xlens), xlens).squeeze(-1)
 
+    def embeddings(self):
+        """Get outputs by layer from last forward pass for introspection"""
+        return self.enc.hs + self.dec.hs[:-1]
+
     def activations(self):
         """Get flat values by layer from last forward pass for introspection"""
         a_acts = []
@@ -67,12 +71,15 @@ class Sequential(nn.Module):
         self.layers = nn.ModuleList(layers)
     
     def forward(self, x, xlens = None):
+        hs = []
         for layer in self.layers:
             sig = inspect.signature(layer.forward)
             if 'xlens' in sig.parameters:
                 x = layer(x, xlens)
             else:
                 x = layer(x)
+            hs.append(x)  # store outputs for introspection
+        self.hs = hs
         return x
 
 class AttentionBlock(nn.Module):

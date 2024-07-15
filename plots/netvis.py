@@ -31,9 +31,23 @@ def main(listpath, featurepath, featurename, netpath, index):
   loss = MSE(bpred, by)
   loss.backward()
 
+  plot_embeddings(model)
   plot_activations(model)
   plot_gradients(model)
   plot_outputs(data, model)
+
+def plot_embeddings(model):
+  hs = model.embeddings()
+
+  for l, h in enumerate(hs):
+    print(f"Embeddings {l} mean: {h.mean()} stdev: {h.std()}")
+    hy, hx = torch.histogram(h, density=True)
+    plt.plot(hx[:-1].detach(), hy.detach(), label=f"Layer {l}")
+
+  plt.ylabel("Density")
+  plt.title("Layer Embeddings")
+  plt.legend()
+  plt.show()
 
 def plot_activations(model):
   a_acts, h_acts = model.activations()
@@ -90,15 +104,16 @@ def plot_outputs(data, model):
   model.eval()
   for (bx, wx, by, wy, s) in data:  # blackRecent, whiteRecent, game.black.rating, game.white.rating, game.score
     print(".", end="", flush=True)
-    with torch.no_grad():
-      outs.append(model(bx.to(device)).item())
-      labels.append(by)
-      outs.append(model(wx.to(device)).item())
-      labels.append(wy)
+    labels.append(by)
+    labels.append(wy)
+    if progress < 20:  # temp limit
+      with torch.no_grad():
+        outs.append(model(bx.to(device)).item())
+        outs.append(model(wx.to(device)).item())
     progress += 1
-    # if progress > 20:
-      # break  # temp
 
+  print()
+  print(f"Outputs mean: {np.mean(outs)} stdev: {np.std(outs)}")
   print(f"Labels mean: {np.mean(labels)} stdev: {np.std(labels)}")
 
   hy, hx = np.histogram(outs, bins='auto', density=True)

@@ -67,7 +67,7 @@ $ python3 plots/estimate_vs_label.py csv/games_glicko.csv Glicko-2
 
 # Neural Network Visualization
 
-These are plots of the strength model network's activations and gradients. Then a plot of the network's output distribution, compared to the training label distribution.
+These are plots of the strength model network's internal values: layer outputs, activations and gradients. Then a plot of the network's output distribution, compared to the training label distribution.
 
 ```
 $ PYTHONPATH=python python3 plots/netvis.py csv/games_labels.csv featurecache --net nets/model.pth --index 10 --featurename pick
