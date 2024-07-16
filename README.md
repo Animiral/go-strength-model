@@ -281,26 +281,53 @@ Dataset checked, 10000 train/5000 validation/5000 test, 0 errors.
 
 ## The Training Command
 
-We use the `train.py` script included in this repository to train the strength model on the above precomputed data. Invoke it from the shell like this:
+The `train.py` file included in this repository can be launched as a standalone script to train the strength model on the above precomputed data. Invoke it from the shell like this:
 
 ```
 LIST=csv/games_labels.csv
 FEATUREDIR=path/to/featurecache
-OUTFILE=nets/strmodel{}.pth
-TRAINLOSSFILE=logs/strtrainloss.txt
-TESTLOSSFILE=logs/strtestloss.txt
+FEATURENAME=pick
+OUTFILE=nets/model{}.pth
+TRAINLOSSFILE=logs/trainloss.txt
+VALIDATIONLOSSFILE=logs/validationloss.txt
 BATCHSIZE=100
-STEPS=50
+STEPS=100
 EPOCHS=100
 
-python3 python/model/train.py $LIST $FEATUREDIR --outfile "$OUTFILE" \
+python3 python/model/train.py $LIST $FEATUREDIR --featurename $FEATURENAME --outfile "$OUTFILE" \
   --batch-size $BATCHSIZE --steps $STEPS --epochs $EPOCHS \
-  --trainlossfile $TRAINLOSSFILE --testlossfile $TESTLOSSFILE
+  --trainlossfile $TRAINLOSSFILE --validationlossfile $VALIDATIONLOSSFILE
 ```
 
 Please keep in mind that relative SGF paths in `LISTFILE` must be relative to the current working directory.
 The `LISTFILE` must contain the "Set" column from the labeling step. The script uses 'T' (training) rows for training and 'V' (validation) rows to check performance.
 After every epoch, the trained network weights are saved in a separate file according to the pattern given as `OUTFILE`. The epoch number takes the place of the placeholder `{}` in the final name.
+
+## Hyperparameter Optimization
+
+The training method as specified in the thesis uses a random search for the best hyperparameters. This process is handled by the script `hpsearch.py` in this repository. Invoke it as follows.
+
+```
+LIST=csv/games_labels.csv
+FEATUREDIR=path/to/featurecache
+FEATURENAME=pick
+TITLE=search
+NETDIR=nets
+LOGDIR=logs
+BATCHSIZE=100
+STEPS=100
+EPOCHS=100
+SAMPLES=15
+BROADITERATIONS=2
+FINEITERATIONS=2
+
+python3 -u python/model/hpsearch.py $LIST $FEATUREDIR --featurename $FEATURENAME --title "$TITLE" \
+  --netdir $NETDIR --logdir $LOGDIR \
+  --batch-size $BATCHSIZE --steps $STEPS --epochs $EPOCHS \
+  --samples $SAMPLES --broad-iterations $BROADITERATIONS --fine-iterations $FINEITERATIONS
+```
+
+The same notes regarding `LISTFILE` apply as in the Training Command section above.
 
 # Evaluation
 

@@ -36,10 +36,20 @@ def main(args):
         print(f"Executing katago...")
         xs = katago(katapath, katamodel, kataconfig, sgfs, outFile.name, featurename, playername)
 
+    print(f"Loading strength model...")
+
+    modeldata = torch.load(modelfile)
+    featureDims = modeldata["featureDims"]
+    depth = modeldata["depth"]
+    hiddenDims = modeldata["hiddenDims"]
+    queryDims = modeldata["queryDims"]
+    inducingPoints = modeldata["inducingPoints"]
+    model = StrengthNet(featureDims, depth, hiddenDims, queryDims, inducingPoints).to(device)
+    model.load_state_dict(modeldata["modelState"])
+    assert(featureDims == xs.shape[1])  # strength model must fit KataGo model
+
     print(f"Executing strength model...")
-    featureDims = xs.shape[1]
-    model = newmodel(featureDims, args).to(device)
-    model.load_state_dict(torch.load(modelfile))
+
     pred = evaluate(xs, model)
     pred = scale_rating(pred)
 

@@ -176,23 +176,26 @@ def load_features_from_zip(path: str, featureName: str, featureDims: int = -1):
 
     return torch.tensor(data).reshape(movecount, featureDims)
 
-def pad_collate_one(rs):
-    lens = [r.shape[0] for r in rs]
-    rs = [r for r in rs if len(r) > 0]
-    collated = torch.cat(rs, dim=0) if rs else torch.empty((0,0))
-    return lens, collated
-
-def pad_collate(batch):
-    brecent, wrecent, brating, wrating, score = zip(*batch)
-    blens, brecent = pad_collate_one(brecent)
-    wlens, wrecent = pad_collate_one(wrecent)
-    brating, wrating, score = map(torch.Tensor, (brating, wrating, score))
-    return brecent, wrecent, blens, wlens, brating, wrating, score
 
 class MovesDataLoader(DataLoader):
-    def __init__(self, *args, **kwargs):
-        kwargs["collate_fn"] = pad_collate
+    def __init__(self, windowSize, *args, **kwargs):
+        self.windowSize = windowSize
+        kwargs["collate_fn"] = self.pad_collate
         super().__init__(*args, **kwargs)
+
+    def pad_collate_one(self, rs):
+        rs = [r[-self.windowSize:] for r in rs]       # clip to spec size
+        lens = [r.shape[0] for r in rs]               # get lengths
+        rs = [r for r in rs if len(r) > 0]            # remove empties
+        collated = torch.cat(rs, dim=0) if rs else torch.empty((0,0))
+        return lens, collated
+
+    def pad_collate(self, batch):
+        brecent, wrecent, brating, wrating, score = zip(*batch)
+        blens, brecent = self.pad_collate_one(brecent)
+        wlens, wrecent = self.pad_collate_one(wrecent)
+        brating, wrating, score = map(torch.Tensor, (brating, wrating, score))
+        return brecent, wrecent, blens, wlens, brating, wrating, score
 
 def bradley_terry_score(black_rating, white_rating):
     """Estimate the match score between two ratings determined by model output (same scale as labels)"""

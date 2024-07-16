@@ -13,6 +13,11 @@ class StrengthNet(nn.Module):
 
     def __init__(self, featureDims: int, depth: int=3, hiddenDims: int=64, queryDims: int=64, inducingPoints: int=64):
         super(StrengthNet, self).__init__()
+        self.featureDims = featureDims
+        self.depth = depth
+        self.hiddenDims = hiddenDims
+        self.queryDims = queryDims
+        self.inducingPoints = inducingPoints
 
         layers = []
         layers.append(nn.Linear(featureDims, hiddenDims, bias=False))

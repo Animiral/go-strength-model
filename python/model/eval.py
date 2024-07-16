@@ -22,8 +22,15 @@ def main(args):
     print(f"Device: {device}")
 
     data = MovesDataset(listfile, featuredir, setmarker, featurename=featurename)
-    model = StrengthNet(data.featureDims).to(device)
-    model.load_state_dict(torch.load(modelfile))
+
+    modeldata = torch.load(modelfile)
+    featureDims = modeldata["featureDims"]
+    depth = modeldata["depth"]
+    hiddenDims = modeldata["hiddenDims"]
+    queryDims = modeldata["queryDims"]
+    inducingPoints = modeldata["inducingPoints"]
+    model = StrengthNet(featureDims, depth, hiddenDims, queryDims, inducingPoints).to(device)
+    model.load_state_dict(modeldata["modelState"])
 
     for i, game in enumerate(data.marked):
         bpred, wpred, spred = evaluate(data, i, model)
