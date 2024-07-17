@@ -4,6 +4,7 @@
 import argparse
 import os
 import copy
+import datetime
 import math
 import random
 import torch
@@ -31,7 +32,7 @@ def main(args):
     print(f"Load training data from {listfile}")
     print(f"Load precomputed {featurename} features from {featuredir}")
     print(f"Save model(s) to {outfile}")
-    print(f"Batch size: {batch_size}")
+    print(f"Batch size: {batchSize}")
     print(f"Steps: {steps}")
     print(f"Epochs: {epochs}")
     print(f"Device: {device}")
@@ -53,36 +54,42 @@ def main(args):
     inducingPoints = args.get("inducing_points", 8)
 
     validationLoader = MovesDataLoader(windowSize, validationData, batch_size=batchSize)
-    model = StrengthNet(featureDims, depth, hiddenDims, queryDims, inducingPoints)
+    model = StrengthNet(trainData.featureDims, depth, hiddenDims, queryDims, inducingPoints)
     model = model.to(device)
 
     def callback(model, e, trainloss, validationloss):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"\t[{timestamp}] Epoch {e} error: training {trainloss[-1]:>8f}, validation {validationloss:>8f}")
+        print(f"[{timestamp}] Epoch {e} error: training {trainloss[-1]:>8f}, validation {validationloss:>8f}")
         if validationlossfile:
             validationlossfile.write(f"{validationloss}\n")
         if trainlossfile:
             for loss in trainloss:
                 trainlossfile.write(f"{loss}\n")
         if outfile:
-            modelfile = outfile.replace('{}', str(e+1))
-            torch.save({
-                "modelState": model.state_dict(),
-                "featureDims": model.featureDims,
-                "depth": model.depth,
-                "hiddenDims": model.hiddenDims,
-                "queryDims": model.queryDims,
-                "inducingPoints": model.inducingPoints
-            }, modelfile)
+            modelfile = outfile.replace("{}", str(e+1))
+            savemodel(model, modelfile)
 
     t = Training(callback, trainData, validationLoader,
                  epochs, steps, batchSize, learningrate, lrdecay, windowSize)
     bestmodel, validationloss = t.run(model)
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"\t[{timestamp}] Training done, best validation loss: {validationloss}")
+    if outfile:
+        modelfile = outfile.replace("{}", "")
+        savemodel(model, modelfile)
 
     trainlossfile and trainlossfile.close()
     validationlossfile and validationlossfile.close()
+
+def savemodel(model, modelfile):
+    torch.save({
+        "modelState": model.state_dict(),
+        "featureDims": model.featureDims,
+        "depth": model.depth,
+        "hiddenDims": model.hiddenDims,
+        "queryDims": model.queryDims,
+        "inducingPoints": model.inducingPoints
+    }, modelfile)
 
 def loss(bpred, wpred, by, wy, score, tau=None):
     if tau is None:
@@ -171,7 +178,8 @@ class Training:
                 bx, by, wx, wy, score = map(lambda t: t.to(device), (bx, by, wx, wy, score))
                 bpred, wpred = model(bx, blens), model(wx, wlens)
                 l = loss(bpred, wpred, by, wy, score)
-                test_loss += l.item()
+                batchSize = len(score)
+                test_loss += l.item() / batchSize
         test_loss /= batches
         return test_loss
 

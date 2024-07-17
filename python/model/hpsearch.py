@@ -11,7 +11,7 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, RandomSampler, BatchSampler
 from moves_dataset import MovesDataset, MovesDataLoader, bradley_terry_score
-from train import Training
+from train import Training, savemodel
 from strengthnet import StrengthNet
 from torch.optim.lr_scheduler import StepLR
 
@@ -54,19 +54,25 @@ def main(args):
         print(f"[{timestamp}] {message}\n")
         logfile.write(f"[{timestamp}] {message}\n")
 
+    model = None
+
     for i in range(broadIterations):
         logMessage(f"=== Hyperparameter Search: Broad Iteration {i} ===")
-        hparams = search.searchBroad()
+        hparams, model, validationloss = search.searchBroad()
         learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = hparams
-        logMessage(f"Best hparams broad{i}: lr={learningrate} decay={lrdecay} " +
+        logMessage(f"Best hparams (vloss={validationloss}) broad{i}: lr={learningrate} decay={lrdecay} " +
             f"N={windowSize} l={depth} d={hiddenDims} dq={queryDims} m={inducingPoints}")
 
     for i in range(fineIterations):
         logMessage(f"=== Hyperparameter Search: Fine Iteration {i} ===")
-        hparams = search.searchFine()
+        hparams, model, validationloss = search.searchFine()
         learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = hparams
-        logMessage(f"Best hparams fine{i}: lr={learningrate} decay={lrdecay} " +
+        logMessage(f"Best hparams (vloss={validationloss}) fine{i}: lr={learningrate} decay={lrdecay} " +
             f"N={windowSize} l={depth} d={hiddenDims} dq={queryDims} m={inducingPoints}")
+
+    if model:
+        modelfile = f"{netdir}/{title}/model.pth"
+        savemodel(model, modelfile)
 
     logfile.close()
 
@@ -87,14 +93,14 @@ class HyperparamSearch:
         self.steps = steps
         self.batchSize = batchSize
         self.trainingSamples = trainingSamples
-        self.hparams = (10**-3,   # learning rate
-            0.95,                 # lr decay
-            400,                  # window size
-            3,                    # model depth
-            64,                   # hidden dims
-            64,                   # query dims
-            32)                   # inducing points
-        self.bestloss = float("inf")
+        hparams = (10**-3,   # learning rate
+                   0.95,     # lr decay
+                   400,      # window size
+                   3,        # model depth
+                   64,       # hidden dims
+                   64,       # query dims
+                   32)       # inducing points
+        self.best = (hparams, None, float("inf"))
 
     def search(self, randomParams):
         samples = []
@@ -102,11 +108,9 @@ class HyperparamSearch:
             hparams = randomParams()
             model, validationloss = self.training(sequence, hparams)
             samples.append((hparams, model, validationloss))
-        bestsample = min(samples + [(self.hparams, None, self.bestloss)], key=lambda x: x[2])
-        self.hparams = bestsample[0]
-        self.bestloss = bestsample[2]
+        self.best = min(samples + [self.best], key=lambda x: x[2])
         self.iteration += 1
-        return self.hparams
+        return self.best
 
     def searchBroad(self):
         return self.search(self.randomParamsBroad)
@@ -115,7 +119,7 @@ class HyperparamSearch:
         return self.search(self.randomParamsFine)
 
     def randomParamsBroad(self):
-        learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = self.hparams
+        learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = self.best[0]
         learningrate = learningrate * (10**random.uniform(-3, 3))
         lrdecay = lrdecay + random.uniform(-0.5, 0.5)
         windowSize = random.randint(10, 500)
@@ -126,7 +130,7 @@ class HyperparamSearch:
         return self.clampParams(learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints)
 
     def randomParamsFine(self):
-        learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = self.hparams
+        learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = self.best[0]
         learningrate = learningrate * (10**random.uniform(-0.3, 0.3))
         lrdecay = lrdecay + random.uniform(-0.05, 0.05)
         windowSize = windowSize + random.randint(-100, 100)
@@ -178,14 +182,7 @@ class HyperparamSearch:
         for loss in trainloss:
             trainlossfile.write(f"{loss}\n")
         modelfile = f"{self.netdir}/{self.title}/model_{self.iteration}_{sequence}_{e}.pth"
-        torch.save({
-            "modelState": model.state_dict(),
-            "featureDims": model.featureDims,
-            "depth": model.depth,
-            "hiddenDims": model.hiddenDims,
-            "queryDims": model.queryDims,
-            "inducingPoints": model.inducingPoints
-        }, modelfile)
+        savemodel(model, modelfile)
 
     def logMessage(self, logfile, message):
         print(message)
