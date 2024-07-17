@@ -38,15 +38,8 @@ def main(args):
 
     print(f"Loading strength model...")
 
-    modeldata = torch.load(modelfile)
-    featureDims = modeldata["featureDims"]
-    depth = modeldata["depth"]
-    hiddenDims = modeldata["hiddenDims"]
-    queryDims = modeldata["queryDims"]
-    inducingPoints = modeldata["inducingPoints"]
-    model = StrengthNet(featureDims, depth, hiddenDims, queryDims, inducingPoints).to(device)
-    model.load_state_dict(modeldata["modelState"])
-    assert(featureDims == xs.shape[1])  # strength model must fit KataGo model
+    model = StrengthNet.load(modelfile).to(device)
+    assert(model.featureDims == xs.shape[1])  # strength model must fit KataGo model
 
     print(f"Executing strength model...")
 

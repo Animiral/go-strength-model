@@ -67,7 +67,7 @@ def main(args):
                 trainlossfile.write(f"{loss}\n")
         if outfile:
             modelfile = outfile.replace("{}", str(e+1))
-            savemodel(model, modelfile)
+            model.save(modelfile)
 
     t = Training(callback, trainData, validationLoader,
                  epochs, steps, batchSize, learningrate, lrdecay, windowSize)
@@ -76,20 +76,10 @@ def main(args):
     print(f"\t[{timestamp}] Training done, best validation loss: {validationloss}")
     if outfile:
         modelfile = outfile.replace("{}", "")
-        savemodel(model, modelfile)
+        model.save(modelfile)
 
     trainlossfile and trainlossfile.close()
     validationlossfile and validationlossfile.close()
-
-def savemodel(model, modelfile):
-    torch.save({
-        "modelState": model.state_dict(),
-        "featureDims": model.featureDims,
-        "depth": model.depth,
-        "hiddenDims": model.hiddenDims,
-        "queryDims": model.queryDims,
-        "inducingPoints": model.inducingPoints
-    }, modelfile)
 
 def loss(bpred, wpred, by, wy, score, tau=None):
     if tau is None:

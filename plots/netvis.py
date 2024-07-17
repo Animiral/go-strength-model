@@ -16,11 +16,13 @@ from model.strengthnet import StrengthNet
 device = "cpu"
 
 def main(listpath, featurepath, featurename, netpath, index):
-  data = MovesDataset(listpath, featurepath, 'T', featurename=featurename)
-  model = newmodel(data.featureDims).to(device)
+  data = MovesDataset(listpath, featurepath, "T", featurename=featurename)
 
   if netpath:
-    model.load_state_dict(torch.load(netpath)).to(device)
+    model = StrengthNet.load(netpath)
+  else:
+    model = newmodel(data.featureDims)
+  model = model.to(device)
 
   bx, wx, by, wy, s = data[index]  # blackRecent, whiteRecent, game.black.rating, game.white.rating, game.score
   print(f"Game {index}: {len(bx)} black recent, {len(wx)} white recent, by={by}, wy={wy}, s={s}")
@@ -116,7 +118,7 @@ def plot_outputs(data, model):
   print(f"Outputs mean: {np.mean(outs)} stdev: {np.std(outs)}")
   print(f"Labels mean: {np.mean(labels)} stdev: {np.std(labels)}")
 
-  hy, hx = np.histogram(outs, bins='auto', density=True)
+  hy, hx = np.histogram(outs, bins="auto", density=True)
   plt.plot(hx[:-1], hy, label=f"Model Output")
   hy, hx = np.histogram(labels, bins="auto", density=True)
   plt.plot(hx[:-1], hy, label=f"Training Labels")

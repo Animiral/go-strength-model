@@ -68,6 +68,27 @@ class StrengthNet(nn.Module):
                 h_grads.append(hres)
         return a_grads, h_grads
 
+    def save(self, modelfile):
+        torch.save({
+            "modelState": self.state_dict(),
+            "featureDims": self.featureDims,
+            "depth": self.depth,
+            "hiddenDims": self.hiddenDims,
+            "queryDims": self.queryDims,
+            "inducingPoints": self.inducingPoints
+        }, modelfile)
+
+    @staticmethod
+    def load(modelfile):
+        modeldata = torch.load(modelfile)
+        featureDims = modeldata["featureDims"]
+        depth = modeldata["depth"]
+        hiddenDims = modeldata["hiddenDims"]
+        queryDims = modeldata["queryDims"]
+        inducingPoints = modeldata["inducingPoints"]
+        model = StrengthNet(featureDims, depth, hiddenDims, queryDims, inducingPoints)
+        model.load_state_dict(modeldata["modelState"])
+        return model
 
 class Sequential(nn.Module):
     """Like nn.Sequential, but passes xlens (collated minibatch structure) where necessary"""

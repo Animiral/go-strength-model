@@ -11,7 +11,7 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, RandomSampler, BatchSampler
 from moves_dataset import MovesDataset, MovesDataLoader, bradley_terry_score
-from train import Training, savemodel
+from train import Training
 from strengthnet import StrengthNet
 from torch.optim.lr_scheduler import StepLR
 
@@ -72,7 +72,7 @@ def main(args):
 
     if model:
         modelfile = f"{netdir}/{title}/model.pth"
-        savemodel(model, modelfile)
+        model.save(modelfile)
 
     logfile.close()
 
@@ -182,7 +182,7 @@ class HyperparamSearch:
         for loss in trainloss:
             trainlossfile.write(f"{loss}\n")
         modelfile = f"{self.netdir}/{self.title}/model_{self.iteration}_{sequence}_{e}.pth"
-        savemodel(model, modelfile)
+        model.save(modelfile)
 
     def logMessage(self, logfile, message):
         print(message)
