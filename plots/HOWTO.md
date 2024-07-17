@@ -76,3 +76,14 @@ $ PYTHONPATH=python python3 plots/netvis.py csv/games_labels.csv featurecache --
 If the `--net` parameter is unspecified, the net will be randomly initialized.
 The optional `--index` parameter indicates which item from the training set should be passed through the network (always black recent moves). If unspecified, the first item is used by default.
 The optional `--featurename` parameter indicates which feature type from the dataset should be used (`trunk`, `pick` or `head`).
+
+# Training Progress
+
+During training, the progress is recorded as training loss (once every step) and validation loss (once every epoch). 
+This data is usually (if following the commands as laid out in README.txt) stored under `logs/`, in files with `trainloss` and `validationloss` in their name.
+
+The plot script `trainingprogress.py` reads a `trainloss` and a `validationloss` file and draws them.
+
+```
+$ python3 plots/trainingprogress.py logs/trainloss.txt logs/validationloss.txt
+```
