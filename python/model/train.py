@@ -2,11 +2,9 @@
 # Our model training algorithm.
 
 import argparse
-import os
 import copy
 import datetime
 import math
-import random
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, RandomSampler, BatchSampler

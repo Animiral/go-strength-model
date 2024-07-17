@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
+import fontconfig
 
 def to_rank(rating):
   # 654  = 25k, rank(654) = 5

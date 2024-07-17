@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+import fontconfig
 
 def read_losses(filename):
     with open(filename, "r") as file:

@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from model.moves_dataset import MovesDataset, MovesDataLoader
 from model.strengthnet import StrengthNet
+import fontconfig
 
 device = "cpu"
 

@@ -15,6 +15,7 @@ import random
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from scipy.stats import gaussian_kde
+import fontconfig
 
 max_age_dev = 50  # for deviation
 max_age_ranks = 15  # for rank distribution

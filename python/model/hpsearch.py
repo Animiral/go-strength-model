@@ -4,7 +4,6 @@
 import argparse
 import os
 import datetime
-import copy
 import math
 import random
 import torch

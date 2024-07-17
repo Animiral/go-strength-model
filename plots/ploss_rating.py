@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
+import fontconfig
 
 config = {
   'low_rating': 1245,  # 10-kyu

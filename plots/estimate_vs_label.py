@@ -7,7 +7,7 @@ plot them vs the labels from the same file. One plot per set marker (T/V/E).
 import sys
 import csv
 import matplotlib.pyplot as plt
-# import numpy as np
+import fontconfig
 
 def read_csv(path):
   global max_age_dev
