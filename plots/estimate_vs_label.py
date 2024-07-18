@@ -38,6 +38,9 @@ def read_csv(path):
 
 def plot_ratings(x, y, modelname, setname):
   plt.scatter(x, y, alpha=0.1)
+  minx = min(min(x), min(y))
+  maxx = max(max(x), max(y))
+  plt.plot([minx, maxx], [minx, maxx], linestyle="--", color="tab:cyan")
   plt.xlabel("Rating")
   plt.ylabel("Model")
   plt.title(f"{modelname} vs Labels in {setname}")
