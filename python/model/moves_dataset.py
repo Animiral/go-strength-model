@@ -44,11 +44,11 @@ class MovesDataset(Dataset):
     """Load the dataset from a CSV list file"""
 
     GLICKO2_SCALE = 173.7178   # from goratings Glicko-2 implementation
-    GLICKO2_MEAN = 1575.6314189190516   # empirical mean of training set
-    GLICKO2_STDEV = GLICKO2_SCALE * 1.7766241921153325   # empirical stdev of training set
+    GLICKO2_MEAN = 1623.1912875700598   # empirical mean of training labels
+    GLICKO2_STDEV = 315.8087941393861   # empirical stdev of training labels
 
     def __init__(self, listpath: str, featuredir: str, marker: str, *,
-      featurename: str = "pick", sparse: bool = True):
+      featurename: str = "pick", sparse: bool = True, featurememory: bool = True):
         self.featuredir = featuredir
         self.players: Dict[str, GameEntry] = {}  # stores last occurrence of player
         self.games = List[GameEntry]
@@ -58,6 +58,7 @@ class MovesDataset(Dataset):
             self.games = [self._makeGameEntry(r) for r in reader if (not sparse) or marker == r["Set"]]
 
         self.marked = [g for g in self.games if g.marker == marker]
+        self.features = {} if featurememory else None  # cache filled on demand
         self.featureName = featurename  # used to select correct feature data from ZIP
         self.featureDims = self._findFeatureDims()
 
@@ -105,7 +106,15 @@ class MovesDataset(Dataset):
 
         basePath, _ = os.path.splitext(game.sgfPath)
         featurePath = f"{self.featuredir}/{basePath}_{player}Recent.zip"
-        return load_features_from_zip(featurePath, featureName, featureDims)
+
+        # no need to load features from disk if they are in (optional) memory cache
+        if self.features is not None and (featurePath, featureName) in self.features:
+            return self.features[(featurePath, featureName)]
+        else:
+            features = load_features_from_zip(featurePath, featureName, featureDims)
+            if self.features is not None:
+                self.features[(featurePath, featureName)] = features
+            return features
 
     def _findFeatureDims(self):
         """Discover feature dimensions by loading recent move data, assuming they are consistent."""
