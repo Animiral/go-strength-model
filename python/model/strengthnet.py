@@ -11,7 +11,7 @@ import inspect
 class StrengthNet(nn.Module):
     """Full model based on Set Transformer"""
 
-    def __init__(self, featureDims: int, depth: int=3, hiddenDims: int=64, queryDims: int=64, inducingPoints: int=64):
+    def __init__(self, featureDims: int, depth: int, hiddenDims: int, queryDims: int, inducingPoints: int):
         super(StrengthNet, self).__init__()
         self.featureDims = featureDims
         self.depth = depth
@@ -41,7 +41,7 @@ class StrengthNet(nn.Module):
         h_acts = []
         for layer in self.enc.layers:
             if isinstance(layer, ISAB):
-                a = torch.cat((layer.ab0.a.flatten(), layer.ab1.a.flatten()))
+                a = torch.cat((layer.ab0.at.a.flatten(), layer.ab1.at.a.flatten()))
                 a_acts.append(a)
                 hres = torch.cat((layer.ab0.hres.flatten(), layer.ab1.hres.flatten()))
                 h_acts.append(hres)
@@ -51,9 +51,9 @@ class StrengthNet(nn.Module):
         """Between forward and backward pass, ensure that relevant layers retain gradients for introspection."""
         for layer in self.enc.layers:
             if isinstance(layer, ISAB):
-                layer.ab0.a.retain_grad()
+                layer.ab0.at.a.retain_grad()
                 layer.ab0.hres.retain_grad()
-                layer.ab1.a.retain_grad()
+                layer.ab1.at.a.retain_grad()
                 layer.ab1.hres.retain_grad()
 
     def grads(self):
@@ -62,7 +62,7 @@ class StrengthNet(nn.Module):
         h_grads = []
         for layer in self.enc.layers:
             if isinstance(layer, ISAB):
-                a = torch.cat((layer.ab0.a.grad.flatten(), layer.ab1.a.grad.flatten()))
+                a = torch.cat((layer.ab0.at.a.grad.flatten(), layer.ab1.at.a.grad.flatten()))
                 a_grads.append(a)
                 hres = torch.cat((layer.ab0.hres.grad.flatten(), layer.ab1.hres.grad.flatten()))
                 h_grads.append(hres)
@@ -108,25 +108,50 @@ class Sequential(nn.Module):
         self.hs = hs
         return x
 
-class AttentionBlock(nn.Module):
-    """Dot-product attention + FC + norms; no batching"""
-    def __init__(self, hiddenDims: int=64, queryDims: int=64):
-        super(AttentionBlock, self).__init__()
+class Attention(nn.Module):
+    """Dot-product attention; no batching"""
+    def __init__(self, queryDims: int):
+        super(Attention, self).__init__()
         self.z = torch.sqrt(torch.tensor(queryDims, dtype=torch.float32))
+
+    def forward(self, q, k, v):
+        a = torch.matmul(q, k.transpose(-2, -1)) / self.z
+        self.a = torch.softmax(a, dim=-1)  # store activations for introspection
+        h = torch.matmul(self.a, v)
+        return h
+
+class AttentionBlock(nn.Module):
+    """Dot-product attention + FC + norms"""
+    def __init__(self, hiddenDims: int, queryDims: int):
+        super(AttentionBlock, self).__init__()
         self.WQ = nn.Linear(hiddenDims, queryDims, bias=False)
         self.WK = nn.Linear(hiddenDims, queryDims, bias=False)
         self.WV = nn.Linear(hiddenDims, hiddenDims, bias=False)
+        self.at = Attention(queryDims)
         self.fc = nn.Linear(hiddenDims, hiddenDims, bias=True)
         self.norm0 = nn.LayerNorm(hiddenDims)
         self.norm1 = nn.LayerNorm(hiddenDims)
 
-    def forward(self, q, h):
+    def forward(self, q, qlens, h, hlens):
         qq = self.WQ(q)
         k, v = self.WK(h), self.WV(h)
 
-        a = torch.matmul(qq, k.transpose(-2, -1)) / self.z
-        self.a = torch.softmax(a, dim=-1)  # store activations for introspection
-        h = self.norm0(q + torch.matmul(self.a, v))
+        qslices = list(unbatch(q, qlens))
+        hslices = list(unbatch(h, hlens))
+        if not qlens:  # duplicate one query set over all h slices
+            qslices = qslices * len(hslices)
+
+        hs = []  # attention outputs
+
+        for ((qstart, qend), (hstart, hend)) in zip(qslices, hslices):
+            h = self.at(qq[qstart:qend], k[hstart:hend], v[hstart:hend])
+            hs.append(h)
+
+        h = torch.cat(hs, dim=0)
+        h = h.view(-1, len(q), h.shape[-1])  # split batch dimension for broadcast add
+        q = q.unsqueeze(0)  # add batch dimension of 1 for broadcast add
+        h = self.norm0(q + h)
+        h = h.flatten(0, 1)  # remove batch dimension
         self.hres = self.fc(h)  # store preactivations for introspection
         h = self.norm1(h + torch.relu(self.hres))
 
@@ -134,7 +159,7 @@ class AttentionBlock(nn.Module):
 
 class ISAB(nn.Module):
     """Induced set attention block"""
-    def __init__(self, hiddenDims: int=64, queryDims: int=64, inducingPoints: int=64):
+    def __init__(self, hiddenDims: int, queryDims: int, inducingPoints: int):
         super(ISAB, self).__init__()
         self.i = nn.Parameter(torch.Tensor(inducingPoints, hiddenDims))
         nn.init.uniform_(self.i)
@@ -142,35 +167,22 @@ class ISAB(nn.Module):
         self.ab1 = AttentionBlock(hiddenDims, queryDims)
 
     def forward(self, x, xlens = None):
-        os = []  # outputs
-
-        for start, end in unbatch(x, xlens):
-            h = x[start:end]
-            i = self.ab0(self.i, h)
-            o = self.ab1(h, i)
-            os.append(o)
-
-        os = torch.cat(os, dim=0)
-        return os
+        h = self.ab0(self.i, None, x, xlens)  # (batchSize * inducingPoints) x hiddenDims
+        hlens = [len(self.i)] * (len(h) // len(self.i))
+        y = self.ab1(x, xlens, h, hlens)
+        return y
 
 class Pool(nn.Module):
     """Attention pooling layer with learned seed vector"""
-    def __init__(self, hiddenDims: int=64, queryDims: int=64, inducingPoints: int=64):
+    def __init__(self, hiddenDims: int, queryDims: int):
         super(Pool, self).__init__()
         self.s = nn.Parameter(torch.Tensor(1, hiddenDims))
         nn.init.uniform_(self.s)
         self.ab = AttentionBlock(hiddenDims, queryDims)
 
     def forward(self, x, xlens = None):
-        os = []  # outputs
-
-        for start, end in unbatch(x, xlens):
-            h = x[start:end]
-            o = self.ab(self.s, h)
-            os.append(o)
-
-        os = torch.cat(os, dim=0)
-        return os
+        y = self.ab(self.s, None, x, xlens)
+        return y
 
 def unbatch(x, xlens):
     """Get an iterable over the batch elements in x"""
