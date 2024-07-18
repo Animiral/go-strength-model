@@ -10,7 +10,7 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, RandomSampler, BatchSampler
 from moves_dataset import MovesDataset, MovesDataLoader, bradley_terry_score
-from train import Training
+from train import Training, TrainingParams
 from strengthnet import StrengthNet
 from torch.optim.lr_scheduler import StepLR
 
@@ -26,31 +26,23 @@ def main(args):
     batchSize = args["batch_size"]
     steps = args["steps"]
     epochs = args["epochs"]
+    patience = args["patience"]
     samples = args["samples"]
     broadIterations = args["broad_iterations"]
     fineIterations = args["fine_iterations"]
 
-    print(f"Load training data from {listfile}")
-    print(f"Load precomputed {featurename} features from {featuredir}")
-    print(f"This search is titled \"{title}\"")
-    print(f"Save networks in {netdir}/{title}")
-    print(f"Save logs in {logdir}/{title}")
-    print(f"Batch size: {batchSize}")
-    print(f"Steps: {steps}")
-    print(f"Epochs: {epochs}")
-    print(f"Samples per iteration: {samples}")
-    print(f"Number of broad search iterations: {broadIterations}")
-    print(f"Number of fine search iterations: {fineIterations}")
+    for k, v in args.items():
+        print(f"{k}: {v}")
     print(f"Device: {device}")
 
     trainData = MovesDataset(listfile, featuredir, "T", featurename=featurename)
     validationData = MovesDataset(listfile, featuredir, "V", featurename=featurename)
-    search = HyperparamSearch(title, trainData, validationData, netdir, logdir, epochs, steps, batchSize, samples)
+    search = HyperparamSearch(title, trainData, validationData, netdir, logdir, epochs, steps, batchSize, patience, samples)
     logfile = open(f"{logdir}/{title}.txt", "w")
 
     def logMessage(message):
         timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        print(f"[{timestamp}] {message}\n")
+        print(f"[{timestamp}] {message}")
         logfile.write(f"[{timestamp}] {message}\n")
 
     model = None
@@ -79,7 +71,7 @@ class HyperparamSearch:
     """Run multiple trainings with different hyperparameters."""
 
     def __init__(self, title: str, trainData: MovesDataset, validationData: MovesDataset,
-                 netdir: str, logdir: str, epochs: int, steps: int, batchSize: int, trainingSamples: int):
+                 netdir: str, logdir: str, epochs: int, steps: int, batchSize: int, patience: int, trainingSamples: int):
         self.title = title
         os.makedirs(f"{netdir}/{title}", exist_ok=True)
         os.makedirs(f"{logdir}/{title}", exist_ok=True)
@@ -91,6 +83,7 @@ class HyperparamSearch:
         self.epochs = epochs
         self.steps = steps
         self.batchSize = batchSize
+        self.patience = patience
         self.trainingSamples = trainingSamples
         hparams = (10**-3,   # learning rate
                    0.95,     # lr decay
@@ -165,8 +158,9 @@ class HyperparamSearch:
         def callback(model, e, trainloss, validationloss):
             self.epochResult(model, sequence, e, trainloss, validationloss, logfile, trainlossfile, validationlossfile)
 
-        t = Training(callback, self.trainData, validationLoader,
-                     self.epochs, self.steps, self.batchSize, learningrate, lrdecay, windowSize)
+        tparams = TrainingParams(epochs=self.epochs, steps=self.steps, batchSize=self.batchSize,
+                                 learningrate=learningrate, lrdecay=lrdecay, windowSize=windowSize, patience=self.patience)
+        t = Training(callback, self.trainData, validationLoader, tparams)
         bestmodel, validationloss = t.run(model)
 
         logfile.close()
@@ -176,7 +170,7 @@ class HyperparamSearch:
 
     def epochResult(self, model, sequence: int, e: int,
             trainloss, validationloss, logfile, trainlossfile, validationlossfile):
-        self.logMessage(logfile, f"\tEpoch {e} error: training {trainloss[-1]:>8f}, validation {validationloss:>8f} \n")
+        self.logMessage(logfile, f"\tEpoch {e} error: training {trainloss[-1]:>8f}, validation {validationloss:>8f}")
         validationlossfile.write(f"{validationloss}\n")
         for loss in trainloss:
             trainlossfile.write(f"{loss}\n")
@@ -212,6 +206,7 @@ if __name__ == "__main__":
     optional_args.add_argument("-b", "--batch-size", help="Minibatch size", type=int, default=100, required=False)
     optional_args.add_argument("-t", "--steps", help="Number of batches per epoch", type=int, default=100, required=False)
     optional_args.add_argument("-e", "--epochs", help="Nr of training epochs", type=int, default=5, required=False)
+    optional_args.add_argument("-p", "--patience", help="Epochs without improvement before early stop", type=int, default=3, required=False)
     optional_args.add_argument("-s", "--samples", help="Nr of training runs per iteration", type=int, default=15, required=False)
     optional_args.add_argument("-i", "--broad-iterations", help="Nr of broad hyperparameter search iterations", type=int, default=2, required=False)
     optional_args.add_argument("-j", "--fine-iterations", help="Nr of fine hyperparameter search iterations", type=int, default=2, required=False)

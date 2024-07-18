@@ -329,13 +329,14 @@ LOGDIR=logs
 BATCHSIZE=100
 STEPS=100
 EPOCHS=100
+PATIENCE=3
 SAMPLES=15
 BROADITERATIONS=2
 FINEITERATIONS=2
 
 python3 -u python/model/hpsearch.py $LIST $FEATUREDIR --featurename $FEATURENAME --title "$TITLE" \
   --netdir $NETDIR --logdir $LOGDIR \
-  --batch-size $BATCHSIZE --steps $STEPS --epochs $EPOCHS \
+  --batch-size $BATCHSIZE --steps $STEPS --epochs $EPOCHS --patience $PATIENCE \
   --samples $SAMPLES --broad-iterations $BROADITERATIONS --fine-iterations $FINEITERATIONS
 ```
 
