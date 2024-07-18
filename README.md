@@ -290,13 +290,25 @@ FEATURENAME=pick
 OUTFILE=nets/model{}.pth
 TRAINLOSSFILE=logs/trainloss.txt
 VALIDATIONLOSSFILE=logs/validationloss.txt
+LOGFILE=logs/traininglog.txt
+
 BATCHSIZE=100
 STEPS=100
 EPOCHS=100
+LEARNINGRATE=0.001
+LRDECAY=0.95
+PATIENCE=3
 
-python3 python/model/train.py $LIST $FEATUREDIR --featurename $FEATURENAME --outfile "$OUTFILE" \
-  --batch-size $BATCHSIZE --steps $STEPS --epochs $EPOCHS \
-  --trainlossfile $TRAINLOSSFILE --validationlossfile $VALIDATIONLOSSFILE
+WINDOW_SIZE=500
+DEPTH=5
+HIDDEN_DIMS=64
+QUERY_DIMS=64
+INDUCING_POINTS=32
+
+python3 -u python/model/train.py $LIST $FEATUREDIR --featurename $FEATURENAME --outfile "$OUTFILE" \
+  --trainlossfile $TRAINLOSSFILE --validationlossfile $VALIDATIONLOSSFILE \
+  --batch-size $BATCHSIZE --steps $STEPS --epochs $EPOCHS --learningrate $LEARNINGRATE --lrdecay $LRDECAY --patience $PATIENCE \
+  --window-size $WINDOW_SIZE --depth $DEPTH --hidden-dims $HIDDEN_DIMS --query-dims $QUERY_DIMS --inducing-points $INDUCING_POINTS
 ```
 
 Please keep in mind that relative SGF paths in `LISTFILE` must be relative to the current working directory.
@@ -379,15 +391,6 @@ python3 python/model/eval.py "$LIST" "$FEATUREDIR" "$MODELFILE" --outfile "$OUTF
 ```
 
 The output file contains the games from the list that match the given set marker, extended by new columns for predicted ratings and score.
-
-
-# Tests
-
-The modified katago features new tests for the new functionality.
-
-```
-$ katago runstrengthmodeltests
-```
 
 # Plots
 
@@ -500,3 +503,11 @@ $ katago rating_system -config $CONFIG -list $LISTFILE -outlist $OUTFILE -featur
 The `-featuredir` is mandatory and must hold the precomputed extracted move features for every game. These must be prepared by `extract_features` as outlined above.
 
 The output file contains the results of the rating calculation, directly comparable to the output of the Glicko-2 analysis script above.
+
+## C++ Tests
+
+The modified katago features new tests for the new functionality.
+
+```
+$ katago runstrengthmodeltests
+```

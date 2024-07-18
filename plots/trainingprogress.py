@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+# Usage: plots/trainingprogress.py logs/trainloss.txt logs/validationloss.txt
+"""
+Reads a `trainloss` and a `validationloss` file and draws them.
+"""
+
 import sys
 import numpy as np
 import matplotlib.pyplot as plt

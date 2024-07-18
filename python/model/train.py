@@ -5,6 +5,7 @@ import argparse
 import copy
 import datetime
 import math
+from dataclasses import dataclass
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, RandomSampler, BatchSampler
@@ -21,36 +22,31 @@ def main(args):
     outfile = args["outfile"]
     trainlossfile = args["trainlossfile"]
     validationlossfile = args["validationlossfile"]
+
     batchSize = args["batch_size"]
     steps = args["steps"]
     epochs = args["epochs"]
     learningrate = args["learningrate"]
     lrdecay = args["lrdecay"]
+    patience = args["patience"]
 
-    print(f"Load training data from {listfile}")
-    print(f"Load precomputed {featurename} features from {featuredir}")
-    print(f"Save model(s) to {outfile}")
-    print(f"Batch size: {batchSize}")
-    print(f"Steps: {steps}")
-    print(f"Epochs: {epochs}")
+    windowSize = args["window_size"]
+    depth = args["depth"]
+    hiddenDims = args["hidden_dims"]
+    queryDims = args["query_dims"]
+    inducingPoints = args["inducing_points"]
+
+    for k, v in args.items():
+        print(f"{k}: {v}")
     print(f"Device: {device}")
 
     if trainlossfile:
-        print(f"Write training loss to {trainlossfile}")
         trainlossfile = open(trainlossfile, "w")
     if validationlossfile:
-        print(f"Write validation loss to {validationlossfile}")
         validationlossfile = open(validationlossfile, "w")
 
     trainData = MovesDataset(listfile, featuredir, "T", featurename=featurename)
     validationData = MovesDataset(listfile, featuredir, "V", featurename=featurename)
-
-    windowSize = 500
-    depth = args.get("modeldepth", 2)
-    hiddenDims = args.get("hidden_dims", 16)
-    queryDims = args.get("query_dims", 8)
-    inducingPoints = args.get("inducing_points", 8)
-
     validationLoader = MovesDataLoader(windowSize, validationData, batch_size=batchSize)
     model = StrengthNet(trainData.featureDims, depth, hiddenDims, queryDims, inducingPoints)
     model = model.to(device)
@@ -67,11 +63,13 @@ def main(args):
             modelfile = outfile.replace("{}", str(e+1))
             model.save(modelfile)
 
-    t = Training(callback, trainData, validationLoader,
-                 epochs, steps, batchSize, learningrate, lrdecay, windowSize)
+    tparams = TrainingParams(epochs=epochs, steps=steps, batchSize=batchSize, learningrate=learningrate, lrdecay=lrdecay, windowSize=windowSize, patience=patience)
+    t = Training(callback, trainData, validationLoader, tparams)
     bestmodel, validationloss = t.run(model)
+
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"\t[{timestamp}] Training done, best validation loss: {validationloss}")
+
     if outfile:
         modelfile = outfile.replace("{}", "")
         model.save(modelfile)
@@ -89,34 +87,36 @@ def loss(bpred, wpred, by, wy, score, tau=None):
     score_loss = -(1 - (score - bradley_terry_score(bpred, wpred)).abs_()).log_().sum()
     return rating_loss + tau * score_loss
 
+@dataclass
+class TrainingParams:
+    epochs: int
+    steps: int
+    batchSize: int
+    learningrate: float
+    lrdecay: float
+    windowSize: int
+    patience: int
+
 class Training:
     """Implements the training loop, which can be run with different hyperparameters."""
 
-    def __init__(self, callback, trainData: MovesDataset, validationLoader: MovesDataLoader,
-                 epochs: int, steps: int, batchSize: int,
-                 learningrate: float, lrdecay: float, windowSize: int):
+    def __init__(self, callback, trainData: MovesDataset, validationLoader: MovesDataLoader, tparams: TrainingParams):
         self.callback = callback
         self.trainData = trainData
         self.validationLoader = validationLoader
-        self.epochs = epochs
-        self.steps = steps
-        self.batchSize = batchSize
-        self.learningrate = learningrate
-        self.lrdecay = lrdecay
-        self.patience = 3
+        self.tparams = tparams
         self.badEpochs = 0  # early stopping counter until patience runs out
-        self.windowSize = windowSize
 
     def run(self, model):
-        optimizer = torch.optim.Adam(model.parameters(), lr=self.learningrate)
-        scheduler = StepLR(optimizer, step_size=1, gamma=1/self.lrdecay)
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.tparams.learningrate)
+        scheduler = StepLR(optimizer, step_size=1, gamma=1/self.tparams.lrdecay)
         bestmodel = copy.deepcopy(model)
         bestloss = float("inf")
         badEpochs = 0
         validationloss = self.validate(self.validationLoader, model)
         self.callback(model, 0, [float("inf")], validationloss)
 
-        for e in range(self.epochs):
+        for e in range(self.tparams.epochs):
             trainloss = self.epoch(model, optimizer)
             validationloss = self.validate(self.validationLoader, model)
             self.callback(model, e+1, trainloss, validationloss)
@@ -127,7 +127,7 @@ class Training:
                 badEpochs = 0
             else:
                 badEpochs += 1
-                if badEpochs >= self.patience:
+                if badEpochs >= self.tparams.patience:
                     break
 
             scheduler.step()  # decay learning rate
@@ -135,8 +135,10 @@ class Training:
         return bestmodel, bestloss
 
     def epoch(self, model, optimizer):
-        sampler = BatchSampler(RandomSampler(self.trainData, replacement=True, num_samples=self.steps*self.batchSize), self.batchSize, False)
-        loader = MovesDataLoader(self.windowSize, self.trainData, batch_sampler=sampler)
+        num_samples = self.tparams.steps*self.tparams.batchSize
+        rndsampler = RandomSampler(self.trainData, replacement=True, num_samples=num_samples)
+        sampler = BatchSampler(rndsampler, self.tparams.batchSize, False)
+        loader = MovesDataLoader(self.tparams.windowSize, self.trainData, batch_sampler=sampler)
 
         model.train()
         trainloss = []
@@ -177,26 +179,32 @@ if __name__ == "__main__":
     """
 
     parser = argparse.ArgumentParser(description=description,add_help=False)
-    required_args = parser.add_argument_group('required arguments')
-    optional_args = parser.add_argument_group('optional arguments')
+    required_args = parser.add_argument_group("required arguments")
+    optional_args = parser.add_argument_group("optional arguments")
     optional_args.add_argument(
-        '-h',
-        '--help',
-        action='help',
+        "-h",
+        "--help",
+        action="help",
         default=argparse.SUPPRESS,
-        help='show this help message and exit'
+        help="show this help message and exit"
     )
-    required_args.add_argument('listfile', help='CSV file listing games and labels')
-    required_args.add_argument('featuredir', help='Directory containing extracted features')
-    optional_args.add_argument('-f', '--featurename', help='Type of features to train on', type=str, default='pick', required=False)
-    optional_args.add_argument('-o', '--outfile', help='Pattern for model output, with epoch placeholder "{}" ', type=str, required=False)
-    optional_args.add_argument('-b', '--batch-size', help='Minibatch size', type=int, default=100, required=False)
-    optional_args.add_argument('-t', '--steps', help='Number of batches per epoch', type=int, default=100, required=False)
-    optional_args.add_argument('-e', '--epochs', help='Nr of training epochs', type=int, default=5, required=False)
-    optional_args.add_argument('-l', '--learningrate', help='Initial gradient scale', type=float, default=1e-3, required=False)
-    optional_args.add_argument('-d', '--lrdecay', help='Leraning rate decay', type=float, default=0.95, required=False)
-    optional_args.add_argument('--trainlossfile', help='Output file to store training loss values', type=str, required=False)
-    optional_args.add_argument('--validationlossfile', help='Output file to store validation loss values', type=str, required=False)
+    required_args.add_argument("listfile", help="CSV file listing games and labels")
+    required_args.add_argument("featuredir", help="Directory containing extracted features")
+    optional_args.add_argument("-f", "--featurename", help="Type of features to train on", type=str, default="pick", required=False)
+    optional_args.add_argument("-o", "--outfile", help="Pattern for model output, with epoch placeholder \"{}\" ", type=str, required=False)
+    optional_args.add_argument("--trainlossfile", help="Output file to store training loss values", type=str, required=False)
+    optional_args.add_argument("--validationlossfile", help="Output file to store validation loss values", type=str, required=False)
+    optional_args.add_argument("-b", "--batch-size", help="Minibatch size", type=int, default=100, required=False)
+    optional_args.add_argument("-t", "--steps", help="Number of batches per epoch", type=int, default=100, required=False)
+    optional_args.add_argument("-e", "--epochs", help="Nr of training epochs", type=int, default=5, required=False)
+    optional_args.add_argument("-l", "--learningrate", help="Initial gradient scale", type=float, default=1e-3, required=False)
+    optional_args.add_argument("-d", "--lrdecay", help="Leraning rate decay", type=float, default=0.95, required=False)
+    optional_args.add_argument("-p", "--patience", help="Epochs without improvement before early stop", type=int, default=3, required=False)
+    optional_args.add_argument("-w", "--window-size", help="Maximum number of recent moves", type=int, default=500, required=False)
+    optional_args.add_argument("-D", "--depth", help="Number of consecutive attention blocks in model", type=int, default=1, required=False)
+    optional_args.add_argument("-H", "--hidden-dims", help="Hidden feature dimensionality", type=int, default=8, required=False)
+    optional_args.add_argument("-Q", "--query-dims", help="Query feature dimensionality", type=int, default=8, required=False)
+    optional_args.add_argument("-I", "--inducing-points", help="Number of inducing points in attention mechanism", type=int, default=1, required=False)
 
     args = vars(parser.parse_args())
     main(args)
