@@ -25,10 +25,7 @@ def main(args):
     model = StrengthNet.load(modelfile).to(device)
 
     for i, game in enumerate(data.marked):
-        bpred, wpred, spred = evaluate(data, i, model)
-        game.black.predictedRating = scale_rating(bpred)
-        game.white.predictedRating = scale_rating(wpred)
-        game.predictedScore = spred
+        game.black.predictedRating, game.white.predictedRating, game.predictedScore = evaluate(data, i, model)
 
     data.write(outfile)
 
@@ -41,6 +38,7 @@ def evaluate(data: MovesDataset, i: int, model: StrengthNet):
         bx, wx, _, _, _ = data[i]
         bx, wx = bx.to(device), wx.to(device)
         bpred, wpred = model(bx).item(), model(wx).item()
+        bpred, wpred = scale_rating(bpred), scale_rating(wpred)
         spred = glicko_score(bpred, wpred)
     return bpred, wpred, spred
 
