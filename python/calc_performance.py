@@ -65,7 +65,7 @@ def tolerant_log(x): # accepts x=0 and outputs -inf instead of ValueError
 
 # Calculate rating performance on the list file, filter by the given set marker.
 # If fixed_prediction is True, the result will be the same as predicting 50:50 every game.
-def main(listpath, setmarker='V', fixed_prediction=False):
+def main(listpath, setmarker='V', fixed_prediction=False, novice_check=False):
     count = 0         # total records
     success = 0       # correctly predicted game result
     zeroinfo = 0      # number of records with first occurrence of both players
@@ -125,8 +125,9 @@ def main(listpath, setmarker='V', fixed_prediction=False):
 
     print(f"Finished counting run of {count} matchups between {len(players)} players.")
     print(f"Prediction accuracy: {success}/{count} ({success/count:.3f}), logp: {logp}")
-    print(f"Without zero-info matchups: {success_withinfo}/{count_withinfo} ({success_withinfo/(count_withinfo):.3f}), logp: {logp_withinfo}")
-    print(f"Only both-rated matchups: {success_fullinfo}/{count_fullinfo} ({success_fullinfo/count_fullinfo:.3f}), logp: {logp_fullinfo}")
+    if novice_check:
+        print(f"Without zero-info matchups: {success_withinfo}/{count_withinfo} ({success_withinfo/(count_withinfo):.3f}), logp: {logp_withinfo}")
+        print(f"Only both-rated matchups: {success_fullinfo}/{count_fullinfo} ({success_fullinfo/count_fullinfo:.3f}), logp: {logp_fullinfo}")
 
 if __name__ == "__main__":
     import argparse
@@ -134,10 +135,11 @@ if __name__ == "__main__":
     parser.add_argument("list", type=str, help='Path to the CSV file listing the games, results and winrate.')
     parser.add_argument("-m", "--setmarker", type=str, default="*", help='Calculate on "T": training set, "V": validation set, "E": test set, "*": all')
     parser.add_argument("--fixed-prediction", action="store_true", help='Ignore predictions, instead predict 50:50 chances on every single game')
+    parser.add_argument("-n", "--novice-check", action="store_true", help='Print extra stats based on player\'s first occurrences')
     args = parser.parse_args()
 
     if args.setmarker not in ['T', 'V', 'E', '*']:
         raise ValueError("Set marker must be one of 'T', 'V', 'E', '*'.")
 
-    main(args.list, args.setmarker, args.fixed_prediction)
+    main(args.list, args.setmarker, args.fixed_prediction, args.novice_check)
 
