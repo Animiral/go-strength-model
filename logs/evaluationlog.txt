@@ -1,12 +1,16 @@
-Evaluate games from /home/user/thesis/win/go-strength-model/csv7M/games_labels.csv marked 'T'
+Evaluate games from /home/user/thesis/win/go-strength-model/csv/games_labels.csv marked 'T'
 Load precomputed pick features from /home/user/thesis/win/go-strength-model/featurecache
-Save results to /home/user/thesis/win/go-strength-model/csv7M/games_model_t.csv
+Save results to /home/user/thesis/win/go-strength-model/csv/games_model_t.csv
 Device: cuda
-Evaluate games from /home/user/thesis/win/go-strength-model/csv7M/games_labels.csv marked 'V'
+Evaluate games from /home/user/thesis/win/go-strength-model/csv/games_labels.csv marked 'V'
 Load precomputed pick features from /home/user/thesis/win/go-strength-model/featurecache
-Save results to /home/user/thesis/win/go-strength-model/csv7M/games_model_v.csv
+Save results to /home/user/thesis/win/go-strength-model/csv/games_model_v.csv
 Device: cuda
-Evaluate games from /home/user/thesis/win/go-strength-model/csv7M/games_labels.csv marked 'E'
+Evaluate games from /home/user/thesis/win/go-strength-model/csv/games_labels.csv marked 'E'
 Load precomputed pick features from /home/user/thesis/win/go-strength-model/featurecache
-Save results to /home/user/thesis/win/go-strength-model/csv7M/games_model_e.csv
+Save results to /home/user/thesis/win/go-strength-model/csv/games_model_e.csv
+Device: cuda
+Evaluate games from csv/games_labels.csv marked 'V'
+Load precomputed pick features from featurecache
+Save results to csv/games_model.csv
 Device: cuda
