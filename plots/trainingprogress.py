@@ -11,17 +11,40 @@ import fontconfig
 
 def read_losses(filename):
     with open(filename, "r") as file:
-        losses = [float(line.strip()) for line in file]
+        losses = [[float(token) for token in line.split(',')] for line in file]
     return losses
 
 def plot(trainlosses, testlosses):
-    plt.figure(figsize=(12.8, 9.6))
     epochs = len(testlosses)
+
+    lt_s = [row[0] for row in trainlosses]
+    lt_r = [row[1] for row in trainlosses if len(row) > 1]
+    lt_l2 = [row[2] for row in trainlosses if len(row) > 2]
+    lt = [sum(l) for l in zip(lt_s, lt_r, lt_l2)]
+
+    lv_s = [row[0] for row in testlosses]
+    lv_r = [row[1] for row in testlosses if len(row) > 1]
+
     trainstep = (epochs-1)/len(trainlosses)
     trainlabels = np.arange(0, epochs-1, trainstep) + trainstep
     testlabels = range(epochs)
-    plt.plot(trainlabels, trainlosses, label="Training Loss", zorder=1)
-    plt.plot(testlabels, testlosses, label="Validation Loss", zorder=2)  # Ensure test loss is in the foreground
+
+    plt.figure(figsize=(12.8, 9.6))
+
+    plt.fill_between(trainlabels, lt_s, color='blue', alpha=0.3, label='Training Score Loss')
+    if lt_r:
+        plt.fill_between(trainlabels, [sum(x) for x in zip(lt_s, lt_r)], lt_s,
+                         color='blue', alpha=0.5, label='Training Ratings Loss')
+    if lt_l2:
+        plt.fill_between(trainlabels, lt, [sum(x) for x in zip(lt_s, lt_r)],
+                         color='blue', alpha=0.7, label='Training Regularization Loss')
+
+    plt.plot(testlabels, lv_s, color='red', linewidth=2, label='Validation Score Loss')
+    if lv_r:
+        plt.plot(testlabels, lv_r, color='orange', linewidth=2, label='Validation Ratings Loss')
+
+    # plt.plot(trainlabels, trainlosses, label="Training Loss", zorder=1)
+    # plt.plot(testlabels, testlosses, label="Validation Loss", zorder=2)  # Ensure test loss is in the foreground
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title("Training and Validation Loss")

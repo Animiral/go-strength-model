@@ -6,6 +6,8 @@ import os
 import datetime
 import math
 import random
+# import concurrent.futures
+from multiprocessing.pool import ThreadPool
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, RandomSampler, BatchSampler
@@ -17,10 +19,10 @@ from torch.optim.lr_scheduler import StepLR
 device = "cuda"
 
 def main(args):
+    title = args["title"]
     listfile = args["listfile"]
     featuredir = args["featuredir"]
     featurename = args["featurename"]
-    title = args["title"]
     netdir = args["netdir"]
     logdir = args["logdir"]
     batchSize = args["batch_size"]
@@ -35,9 +37,13 @@ def main(args):
         print(f"{k}: {v}")
     print(f"Device: {device}")
 
-    trainData = MovesDataset(listfile, featuredir, "T", featurename=featurename)
-    validationData = MovesDataset(listfile, featuredir, "V", featurename=featurename)
+    # use feature cache? it costs a lot of memory in process parallel search
+    featurememory = True
+    trainData = MovesDataset(listfile, featuredir, "T", featurename=featurename, featurememory=featurememory)
+    validationData = MovesDataset(listfile, featuredir, "V", featurename=featurename, featurememory=featurememory)
     search = HyperparamSearch(title, trainData, validationData, netdir, logdir, epochs, steps, batchSize, patience, samples)
+    # search = HyperparamSearch(title, listfile, featuredir, featurename,
+    #                           netdir, logdir, epochs, steps, batchSize, patience, samples)
     logfile = open(f"{logdir}/{title}.txt", "w")
 
     def logMessage(message):
@@ -71,13 +77,17 @@ class HyperparamSearch:
     """Run multiple trainings with different hyperparameters."""
 
     def __init__(self, title: str, trainData: MovesDataset, validationData: MovesDataset,
+    # def __init__(self, title: str, listfile: str, featuredir: str, featurename: str,
                  netdir: str, logdir: str, epochs: int, steps: int, batchSize: int, patience: int, trainingSamples: int):
         self.title = title
+        # self.listfile = listfile
+        # self.featuredir = featuredir
+        # self.featurename = featurename
+        self.trainData = trainData
+        self.validationData = validationData
         os.makedirs(f"{netdir}/{title}", exist_ok=True)
         os.makedirs(f"{logdir}/{title}", exist_ok=True)
         self.iteration = 0
-        self.trainData = trainData
-        self.validationData = validationData
         self.netdir = netdir
         self.logdir = logdir
         self.epochs = epochs
@@ -95,12 +105,13 @@ class HyperparamSearch:
         self.best = (hparams, None, float("inf"))
 
     def search(self, randomParams):
-        samples = []
-        for sequence in range(self.trainingSamples):
-            hparams = randomParams()
-            model, validationloss = self.training(sequence, hparams)
-            samples.append((hparams, model, validationloss))
-        self.best = min(samples + [self.best], key=lambda x: x[2])
+        hparams = [randomParams() for _ in range(self.trainingSamples)]
+
+        with ThreadPool(1) as pool:
+        # with concurrent.futures.ProcessPoolExecutor() as executor:
+            samples = pool.starmap(self.training1, enumerate(hparams))
+
+        self.best = min(list(samples) + [self.best], key=lambda x: x[2])
         self.iteration += 1
         return self.best
 
@@ -113,7 +124,7 @@ class HyperparamSearch:
     def randomParamsBroad(self):
         learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = self.best[0]
         learningrate = learningrate * (10**random.uniform(-3, 3))
-        lrdecay = lrdecay + random.uniform(-0.5, 0.5)
+        lrdecay = lrdecay + random.uniform(-0.05, 0.05)
         windowSize = random.randint(10, 500)
         depth = random.randint(1, 5)
         hiddenDims = int(math.ceil(hiddenDims * (2**random.uniform(-2, 2))))
@@ -124,7 +135,7 @@ class HyperparamSearch:
     def randomParamsFine(self):
         learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = self.best[0]
         learningrate = learningrate * (10**random.uniform(-0.3, 0.3))
-        lrdecay = lrdecay + random.uniform(-0.05, 0.05)
+        lrdecay = lrdecay + random.uniform(-0.005, 0.005)
         windowSize = windowSize + random.randint(-100, 100)
         depth = random.randint(1, 5)
         hiddenDims = int(math.ceil(hiddenDims * (2**random.uniform(-0.2, 0.2))))
@@ -142,6 +153,11 @@ class HyperparamSearch:
         inducingPoints = 1 if inducingPoints < 1 else 64 if inducingPoints > 64 else inducingPoints
         return learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints
 
+    def training1(self, sequence, hparams):
+        model, validationloss = self.training(sequence, hparams)
+        # model = model.to("cpu")  # for passing to parent process
+        return hparams, model, validationloss
+
     def training(self, sequence: int, hparams):
         logfile = open(f"{self.logdir}/{self.title}/training_{self.iteration}_{sequence}.txt", "w")
         trainlossfile = open(f"{self.logdir}/{self.title}/trainloss_{self.iteration}_{sequence}.txt", "w")
@@ -151,29 +167,42 @@ class HyperparamSearch:
         self.logMessage(logfile, f"HP Search it{self.iteration} seq{sequence} | lr={learningrate} decay={lrdecay} " +
             f"N={windowSize} l={depth} d={hiddenDims} dq={queryDims} m={inducingPoints}")
 
-        validationLoader = MovesDataLoader(windowSize, self.validationData, batch_size=self.batchSize)
-        model = StrengthNet(self.trainData.featureDims, depth, hiddenDims, queryDims, inducingPoints)
+        # trainData = MovesDataset(self.listfile, self.featuredir, "T", featurename=self.featurename)
+        # validationData = MovesDataset(self.listfile, self.featuredir, "V", featurename=self.featurename)
+        trainData = self.trainData
+        validationData = self.validationData
+        validationLoader = MovesDataLoader(windowSize, validationData, batch_size=self.batchSize)
+        model = StrengthNet(trainData.featureDims, depth, hiddenDims, queryDims, inducingPoints)
         model = model.to(device)
 
         def callback(model, e, trainloss, validationloss):
             self.epochResult(model, sequence, e, trainloss, validationloss, logfile, trainlossfile, validationlossfile)
 
         tparams = TrainingParams(epochs=self.epochs, steps=self.steps, batchSize=self.batchSize,
-                                 learningrate=learningrate, lrdecay=lrdecay, windowSize=windowSize, patience=self.patience)
-        t = Training(callback, self.trainData, validationLoader, tparams)
-        bestmodel, validationloss = t.run(model)
+                                 learningrate=learningrate, lrdecay=lrdecay, windowSize=windowSize,
+                                 patience=self.patience, tau_ratings=None, tau_l2=None)
+        t = Training(callback, trainData, validationLoader, tparams)
+        model, validationloss = t.run(model)
 
         logfile.close()
         trainlossfile.close()
         validationlossfile.close()
-        return bestmodel, validationloss
+        return model, validationloss
 
     def epochResult(self, model, sequence: int, e: int,
             trainloss, validationloss, logfile, trainlossfile, validationlossfile):
-        self.logMessage(logfile, f"\tEpoch {e} error: training {trainloss[-1]:>8f}, validation {validationloss:>8f}")
-        validationlossfile.write(f"{validationloss}\n")
-        for loss in trainloss:
-            trainlossfile.write(f"{loss}\n")
+        if trainloss:
+            lt_score, lt_ratings, lt_l2 = trainloss[-1]
+            lt = lt_score + lt_ratings + lt_l2
+        else:
+            lt = lt_score = lt_ratings = lt_l2 = float("inf")
+        lv_score, lv_ratings = validationloss
+        self.logMessage(logfile, f"\tEpoch {e} error: training {lt_score:>8f}(s) + {lt_ratings:>8f}(r) + {lt_l2:>8f}(L2) = {lt:>8f}, validation {lv_score:>8f}(s), {lv_ratings:>8f}(r)")
+
+        validationlossfile.write(f"{lv_score},{lv_ratings}\n")
+        for (lt_score, lt_ratings, lt_l2) in trainloss:
+            trainlossfile.write(f"{lt_score},{lt_ratings},{lt_l2}\n")
+
         modelfile = f"{self.netdir}/{self.title}/model_{self.iteration}_{sequence}_{e}.pth"
         model.save(modelfile)
 

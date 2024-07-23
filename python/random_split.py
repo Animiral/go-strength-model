@@ -129,7 +129,7 @@ if __name__ == "__main__":
         if args.trainingPart < 1:
             trainCount = int(round(rowCount * args.trainingPart))
         else:
-            trainCount = args.trainingPart
+            trainCount = int(args.trainingPart)
         if args.modify:
             preexisting = countRows(csvrows, "T", mask)
             assert preexisting <= trainCount, "Modification to reduce dataset size is not supported"
@@ -138,7 +138,7 @@ if __name__ == "__main__":
         if args.validationPart < 1:
             validationCount = int(round(rowCount * args.validationPart))
         else:
-            validationCount = args.validationPart
+            validationCount = int(args.validationPart)
         if args.modify:
             preexisting = countRows(csvrows, "V", mask)
             assert preexisting <= validationCount, "Modification to reduce dataset size is not supported"
@@ -149,7 +149,7 @@ if __name__ == "__main__":
         elif args.testPart < 1:
             testCount = int(round(rowCount * args.testPart))
         else:
-            testCount = args.testPart
+            testCount = int(args.testPart)
         if args.modify:
             preexisting = countRows(csvrows, "E", mask)
             assert preexisting <= testCount, "Modification to reduce dataset size is not supported"

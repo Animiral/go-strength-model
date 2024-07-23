@@ -29,6 +29,8 @@ def main(args):
     learningrate = args["learningrate"]
     lrdecay = args["lrdecay"]
     patience = args["patience"]
+    tau_ratings = args["tau_ratings"]
+    tau_l2 = args["tau_l2"]
 
     windowSize = args["window_size"]
     depth = args["depth"]
@@ -53,17 +55,26 @@ def main(args):
 
     def callback(model, e, trainloss, validationloss):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[{timestamp}] Epoch {e} error: training {trainloss[-1]:>8f}, validation {validationloss:>8f}")
+        if trainloss:
+            lt_score, lt_ratings, lt_l2 = trainloss[-1]
+            lt = lt_score + lt_ratings + lt_l2
+        else:
+            lt = lt_score = lt_ratings = lt_l2 = float("inf")
+        lv_score, lv_ratings = validationloss
+        print(f"[{timestamp}] Epoch {e} error: training {lt_score:>8f}(s) + {lt_ratings:>8f}(r) + {lt_l2:>8f}(L2) = {lt:>8f}, validation {lv_score:>8f}(s), {lv_ratings:>8f}(r)")
+
         if validationlossfile:
-            validationlossfile.write(f"{validationloss}\n")
-        if trainlossfile:
-            for loss in trainloss:
-                trainlossfile.write(f"{loss}\n")
+            validationlossfile.write(f"{lv_score},{lv_ratings}\n")
+        if trainlossfile and trainloss:
+            for (lt_score, lt_ratings, lt_l2) in trainloss:
+                trainlossfile.write(f"{lt_score},{lt_ratings},{lt_l2}\n")
         if outfile:
             modelfile = outfile.replace("{}", str(e+1))
             model.save(modelfile)
 
-    tparams = TrainingParams(epochs=epochs, steps=steps, batchSize=batchSize, learningrate=learningrate, lrdecay=lrdecay, windowSize=windowSize, patience=patience)
+    tparams = TrainingParams(epochs=epochs, steps=steps, batchSize=batchSize,
+        learningrate=learningrate, lrdecay=lrdecay, windowSize=windowSize, patience=patience,
+        tau_ratings=tau_ratings, tau_l2=tau_l2)
     t = Training(callback, trainData, validationLoader, tparams)
     bestmodel, validationloss = t.run(model)
 
@@ -77,16 +88,32 @@ def main(args):
     trainlossfile and trainlossfile.close()
     validationlossfile and validationlossfile.close()
 
-def loss(bpred, wpred, by, wy, score, tau=None):
-    if tau is None:
-        # default: being off by 200 Glicko-2 points in both bpred and wpred is
-        # as bad as getting the score half wrong.
-        tau = 2*(200/MovesDataset.GLICKO2_STDEV)**2 / -math.log(.5)
-    MSE = nn.MSELoss()
-    rating_loss = MSE(bpred, by) + MSE(wpred, wy)
-    score_loss = -(1 - (score - bradley_terry_score(bpred, wpred)).abs_()).log_().sum()
-    return rating_loss + tau * score_loss
+class StrengthNetLoss:
+    def __init__(self, parameters, tau_ratings=None, tau_l2=None):
+        if tau_ratings is None:
+            # default: being off by 200 Glicko-2 points in both bpred and wpred is
+            # as bad as getting the score half wrong.
+            tau_ratings = -math.log(.5) / 2*(200/MovesDataset.GLICKO2_STDEV)**2
+        if tau_l2 is None:
+            # default: every parameter == 1 is as bad as getting the score half wrong.
+            parameters = list(parameters)
+            tau_l2 = -math.log(.5) / float(sum(p.numel() for p in parameters if p.requires_grad))
 
+        self.parameters = parameters
+        self.tau_ratings = tau_ratings
+        self.tau_l2 = tau_l2
+        self.mse = nn.MSELoss()
+
+    def trainLoss(self, bpred, wpred, by, wy, score):
+        l_score = -(1 - (score - bradley_terry_score(bpred, wpred)).abs_()).log_().sum()
+        l_ratings = self.mse(bpred, by) + self.mse(wpred, wy)
+        l_l2 = sum(p.pow(2).sum() for p in self.parameters)
+        return l_score, self.tau_ratings * l_ratings, self.tau_l2 * l_l2
+
+    def validationLoss(self, bpred, wpred, by, wy, score):
+        l_score = -(1 - (score - bradley_terry_score(bpred, wpred)).abs_()).log_().sum()
+        l_ratings = self.mse(bpred, by) + self.mse(wpred, wy)
+        return l_score, self.tau_ratings * l_ratings
 @dataclass
 class TrainingParams:
     epochs: int
@@ -96,6 +123,8 @@ class TrainingParams:
     lrdecay: float
     windowSize: int
     patience: int
+    tau_ratings: float
+    tau_l2: float
 
 class Training:
     """Implements the training loop, which can be run with different hyperparameters."""
@@ -110,20 +139,22 @@ class Training:
     def run(self, model):
         optimizer = torch.optim.Adam(model.parameters(), lr=self.tparams.learningrate)
         scheduler = StepLR(optimizer, step_size=1, gamma=1/self.tparams.lrdecay)
+        loss = StrengthNetLoss(model.parameters(), self.tparams.tau_ratings, self.tparams.tau_l2)
         bestmodel = copy.deepcopy(model)
         bestloss = float("inf")
         badEpochs = 0
-        validationloss = self.validate(self.validationLoader, model)
-        self.callback(model, 0, [float("inf")], validationloss)
+        validationloss = self.validate(self.validationLoader, model, loss)
+        self.callback(model, 0, [], validationloss)
 
         for e in range(self.tparams.epochs):
-            trainloss = self.epoch(model, optimizer)
-            validationloss = self.validate(self.validationLoader, model)
+            trainloss = self.epoch(model, optimizer, loss)
+            validationloss = self.validate(self.validationLoader, model, loss)
+            epochloss, _ = validationloss  # performance = score loss. we only have ratings loss for reference.
             self.callback(model, e+1, trainloss, validationloss)
 
-            if validationloss < bestloss:
+            if epochloss < bestloss:
                 bestmodel = copy.deepcopy(model)
-                bestloss = validationloss
+                bestloss = epochloss
                 badEpochs = 0
             else:
                 badEpochs += 1
@@ -134,7 +165,7 @@ class Training:
 
         return bestmodel, bestloss
 
-    def epoch(self, model, optimizer):
+    def epoch(self, model, optimizer, loss):
         num_samples = self.tparams.steps*self.tparams.batchSize
         rndsampler = RandomSampler(self.trainData, replacement=True, num_samples=num_samples)
         sampler = BatchSampler(rndsampler, self.tparams.batchSize, False)
@@ -146,32 +177,37 @@ class Training:
         for batchnr, (bx, wx, blens, wlens, by, wy, score) in enumerate(loader):
             bx, by, wx, wy, score = map(lambda t: t.to(device), (bx, by, wx, wy, score))
             bpred, wpred = model(bx, blens), model(wx, wlens)
-            l = loss(bpred, wpred, by, wy, score)
+            l_score, l_ratings, l_l2 = loss.trainLoss(bpred, wpred, by, wy, score)
+            l = l_score + l_ratings + l_l2
             l.backward()
             optimizer.step()
             optimizer.zero_grad()
 
             # keep track of loss
             batchSize = len(score)
-            l = l.item() / batchSize
-            trainloss.append(l)
+            l_score = l_score.item() / batchSize
+            l_ratings = l_ratings.item() / batchSize
+            l_l2 = l_l2.item() / batchSize
+            trainloss.append((l_score, l_ratings, l_l2))
 
         return trainloss
 
-    def validate(self, loader, model):
+    def validate(self, loader, model, loss):
         batches = len(loader)
         model.eval()
 
-        test_loss, correct = 0, 0
+        l_score, l_ratings = 0, 0
         with torch.no_grad():
             for bx, wx, blens, wlens, by, wy, score in loader:
                 bx, by, wx, wy, score = map(lambda t: t.to(device), (bx, by, wx, wy, score))
                 bpred, wpred = model(bx, blens), model(wx, wlens)
-                l = loss(bpred, wpred, by, wy, score)
+                l_s, l_r = loss.validationLoss(bpred, wpred, by, wy, score)
                 batchSize = len(score)
-                test_loss += l.item() / batchSize
-        test_loss /= batches
-        return test_loss
+                l_score += l_s.item() / batchSize
+                l_ratings += l_r.item() / batchSize
+        l_score /= batches
+        l_ratings /= batches
+        return l_score, l_ratings
 
 if __name__ == "__main__":
     description = """
@@ -200,6 +236,8 @@ if __name__ == "__main__":
     optional_args.add_argument("-l", "--learningrate", help="Initial gradient scale", type=float, default=1e-3, required=False)
     optional_args.add_argument("-d", "--lrdecay", help="Leraning rate decay", type=float, default=0.95, required=False)
     optional_args.add_argument("-p", "--patience", help="Epochs without improvement before early stop", type=int, default=3, required=False)
+    optional_args.add_argument("--tau-ratings", help="Scaling factor for rating labels MSE", type=float, default=None, required=False)
+    optional_args.add_argument("--tau-l2", help="Scaling factor for parameter regularization", type=float, default=None, required=False)
     optional_args.add_argument("-w", "--window-size", help="Maximum number of recent moves", type=int, default=500, required=False)
     optional_args.add_argument("-D", "--depth", help="Number of consecutive attention blocks in model", type=int, default=1, required=False)
     optional_args.add_argument("-H", "--hidden-dims", help="Hidden feature dimensionality", type=int, default=8, required=False)
