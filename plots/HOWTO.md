@@ -87,3 +87,12 @@ The plot script `trainingprogress.py` reads a `trainloss` and a `validationloss`
 ```
 $ python3 plots/trainingprogress.py logs/trainloss.txt logs/validationloss.txt
 ```
+
+# Hyperparameter Search Visualization
+
+The hyperparameter search runs multiple trainings, looking for the best hyperparameter set.
+The script `plots/search.py` shows the performance as a series of plots, one for every hyperparameter.
+
+```
+$ python3 plots/search.py path/to/search/logs
+```
