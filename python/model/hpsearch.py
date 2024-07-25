@@ -3,20 +3,35 @@
 
 import argparse
 import os
+import sys
+import copy
 import datetime
 import math
 import random
-# import concurrent.futures
+from dataclasses import dataclass
 from multiprocessing.pool import ThreadPool
+import subprocess
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, RandomSampler, BatchSampler
 from moves_dataset import MovesDataset, MovesDataLoader, bradley_terry_score
-from train import Training, TrainingParams
+from train import Training, TrainingParams, StrengthNetLoss
 from strengthnet import StrengthNet
 from torch.optim.lr_scheduler import StepLR
 
 device = "cuda"
+
+@dataclass
+class HyperParams:
+    """Includes all training params that we optimize with hp search."""
+    learningrate: float
+    lrdecay: float
+    tauRatings: float    # scale of labels MSE in training loss
+    tauL2: float         # scale of param regularization in training loss
+    depth: int           # model layers
+    hiddenDims: int      # hidden feature dimensionality
+    queryDims: int       # query feature dimensionality
+    inducingPoints: int  # number of query vectors in ISAB
 
 def main(args):
     title = args["title"]
@@ -28,6 +43,7 @@ def main(args):
     batchSize = args["batch_size"]
     steps = args["steps"]
     epochs = args["epochs"]
+    workers = args["workers"]
     patience = args["patience"]
     samples = args["samples"]
     broadIterations = args["broad_iterations"]
@@ -37,13 +53,6 @@ def main(args):
         print(f"{k}: {v}")
     print(f"Device: {device}")
 
-    # use feature cache? it costs a lot of memory in process parallel search
-    featurememory = True
-    trainData = MovesDataset(listfile, featuredir, "T", featurename=featurename, featurememory=featurememory)
-    validationData = MovesDataset(listfile, featuredir, "V", featurename=featurename, featurememory=featurememory)
-    search = HyperparamSearch(title, trainData, validationData, netdir, logdir, epochs, steps, batchSize, patience, samples)
-    # search = HyperparamSearch(title, listfile, featuredir, featurename,
-    #                           netdir, logdir, epochs, steps, batchSize, patience, samples)
     logfile = open(f"{logdir}/{title}.txt", "w")
 
     def logMessage(message):
@@ -51,160 +60,151 @@ def main(args):
         print(f"[{timestamp}] {message}")
         logfile.write(f"[{timestamp}] {message}\n")
 
-    model = None
+    search = HyperparamSearch(title, listfile, featuredir, featurename, netdir, logdir, workers, epochs, steps, batchSize, patience, samples)
+
+    modelfile = None
 
     for i in range(broadIterations):
         logMessage(f"=== Hyperparameter Search: Broad Iteration {i} ===")
-        hparams, model, validationloss = search.searchBroad()
-        learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = hparams
-        logMessage(f"Best hparams (vloss={validationloss}) broad{i}: lr={learningrate} decay={lrdecay} " +
-            f"N={windowSize} l={depth} d={hiddenDims} dq={queryDims} m={inducingPoints}")
+        hparams, modelfile, validationloss = search.searchBroad()
+        logMessage(f"Best hparams (vloss={validationloss}) broad{i}: {hparams}")
 
     for i in range(fineIterations):
         logMessage(f"=== Hyperparameter Search: Fine Iteration {i} ===")
-        hparams, model, validationloss = search.searchFine()
-        learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = hparams
-        logMessage(f"Best hparams (vloss={validationloss}) fine{i}: lr={learningrate} decay={lrdecay} " +
-            f"N={windowSize} l={depth} d={hiddenDims} dq={queryDims} m={inducingPoints}")
+        hparams, modelfile, validationloss = search.searchFine()
+        logMessage(f"Best hparams (vloss={validationloss}) fine{i}: {hparams}")
 
-    if model:
-        modelfile = f"{netdir}/{title}/model.pth"
-        model.save(modelfile)
+    if modelfile:
+        bestfile = f"{netdir}/{title}/model.pth"
+        os.symlink(modelfile, bestfile)
 
     logfile.close()
 
 class HyperparamSearch:
     """Run multiple trainings with different hyperparameters."""
 
-    def __init__(self, title: str, trainData: MovesDataset, validationData: MovesDataset,
-    # def __init__(self, title: str, listfile: str, featuredir: str, featurename: str,
-                 netdir: str, logdir: str, epochs: int, steps: int, batchSize: int, patience: int, trainingSamples: int):
+    def __init__(self, title: str, # trainData: MovesDataset, validationData: MovesDataset,
+                 listfile: str, featuredir: str, featurename: str,
+                 netdir: str, logdir: str, workers: int,
+                 epochs: int, steps: int, batchSize: int,
+                 patience: int, trainingSamples: int):
         self.title = title
-        # self.listfile = listfile
-        # self.featuredir = featuredir
-        # self.featurename = featurename
-        self.trainData = trainData
-        self.validationData = validationData
+        # self.trainData = trainData
+        # self.validationData = validationData
+        self.listfile = listfile
+        self.featuredir = featuredir
+        self.featurename = featurename
         os.makedirs(f"{netdir}/{title}", exist_ok=True)
         os.makedirs(f"{logdir}/{title}", exist_ok=True)
         self.iteration = 0
         self.netdir = netdir
         self.logdir = logdir
+        self.workers = workers
         self.epochs = epochs
         self.steps = steps
         self.batchSize = batchSize
         self.patience = patience
         self.trainingSamples = trainingSamples
-        hparams = (10**-3,   # learning rate
-                   0.95,     # lr decay
-                   400,      # window size
-                   3,        # model depth
-                   64,       # hidden dims
-                   64,       # query dims
-                   32)       # inducing points
+        hparams = HyperParams(learningrate = 10**-3,
+                              lrdecay = 0.98,
+                              depth = 3,
+                              hiddenDims = 200,
+                              queryDims = 40,
+                              inducingPoints = 40,
+                              tauRatings = StrengthNetLoss.DEFAULT_TAU_RATINGS,
+                              tauL2 = StrengthNetLoss.DEFAULT_TAU_L2)
         self.best = (hparams, None, float("inf"))
 
-    def search(self, randomParams):
-        hparams = [randomParams() for _ in range(self.trainingSamples)]
+    def search(self, scale):
+        hparams = [self.randomParams(self.best[0], scale) for _ in range(self.trainingSamples)]
 
-        with ThreadPool(1) as pool:
-        # with concurrent.futures.ProcessPoolExecutor() as executor:
-            samples = pool.starmap(self.training1, enumerate(hparams))
+        with ThreadPool(self.workers) as pool:
+            samples = pool.starmap(self.training, enumerate(hparams))
 
         self.best = min(list(samples) + [self.best], key=lambda x: x[2])
         self.iteration += 1
         return self.best
 
     def searchBroad(self):
-        return self.search(self.randomParamsBroad)
+        return self.search(1)
 
     def searchFine(self):
-        return self.search(self.randomParamsFine)
+        return self.search(0.1)
 
-    def randomParamsBroad(self):
-        learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = self.best[0]
-        learningrate = learningrate * (10**random.uniform(-3, 3))
-        lrdecay = lrdecay + random.uniform(-0.05, 0.05)
-        windowSize = random.randint(10, 500)
-        depth = random.randint(1, 5)
-        hiddenDims = int(math.ceil(hiddenDims * (2**random.uniform(-2, 2))))
-        queryDims = int(math.ceil(queryDims * (2**random.uniform(-2, 2))))
-        inducingPoints = inducingPoints + random.randint(-32, 32)
-        return self.clampParams(learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints)
+    def randomParams(self, hparams: HyperParams, scale: float):
+        """Return `hparams` adjusted randomly proportional to `scale`"""
+        hparams = copy.deepcopy(hparams)
+        hparams.learningrate *= 10**random.uniform(-3*scale, 3*scale)
+        hparams.lrdecay += random.uniform(-0.05*scale, 0.05*scale)
+        hparams.tauRatings *= 2**random.uniform(-3*scale, 3*scale)
+        hparams.tauL2 *= 2**random.uniform(-3*scale, 3*scale)
+        hparams.depth = random.randint(1, 5)
+        hparams.hiddenDims = int(math.ceil(hparams.hiddenDims * (2**random.uniform(-2*scale, 2*scale))))
+        hparams.queryDims = int(math.ceil(hparams.queryDims * (2**random.uniform(-2*scale, 2*scale))))
+        hparams.inducingPoints += random.randint(-32*scale, 32*scale)
+        return self.clampParams(hparams)
 
-    def randomParamsFine(self):
-        learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = self.best[0]
-        learningrate = learningrate * (10**random.uniform(-0.3, 0.3))
-        lrdecay = lrdecay + random.uniform(-0.005, 0.005)
-        windowSize = windowSize + random.randint(-100, 100)
-        depth = random.randint(1, 5)
-        hiddenDims = int(math.ceil(hiddenDims * (2**random.uniform(-0.2, 0.2))))
-        queryDims = int(math.ceil(queryDims * (2**random.uniform(-2, 2))))
-        inducingPoints = inducingPoints + random.randint(-3, 3)
-        return self.clampParams(learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints)
+    def clampParams(self, hparams: HyperParams):
+        hparams.learningrate = 10**-5 if hparams.learningrate < 10**-5 else 1 if hparams.learningrate > 1 else hparams.learningrate
+        hparams.lrdecay = 0.9 if hparams.lrdecay < 0.9 else 1 if hparams.lrdecay > 1 else hparams.lrdecay
+        hparams.tauRatings = 0.001 if hparams.tauRatings < 0.001 else 10.0 if hparams.tauRatings > 10.0 else hparams.tauRatings
+        hparams.tauL2 = 0.001 if hparams.tauL2 < 0.001 else 10.0 if hparams.tauL2 > 10.0 else hparams.tauL2
+        hparams.depth = 1 if hparams.depth < 1 else 5 if hparams.depth > 5 else hparams.depth
+        hparams.hiddenDims = 8 if hparams.hiddenDims < 8 else 256 if hparams.hiddenDims > 256 else hparams.hiddenDims
+        hparams.queryDims = 8 if hparams.queryDims < 8 else 256 if hparams.queryDims > 256 else hparams.queryDims
+        hparams.inducingPoints = 1 if hparams.inducingPoints < 1 else 64 if hparams.inducingPoints > 64 else hparams.inducingPoints
+        return hparams
 
-    def clampParams(self, learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints):
-        learningrate = 10**-5 if learningrate < 10**-5 else 1 if learningrate > 1 else learningrate
-        lrdecay = 0.9 if lrdecay < 0.9 else 1 if lrdecay > 1 else lrdecay
-        windowSize = 10 if windowSize < 10 else 500 if windowSize > 500 else windowSize
-        depth = 1 if depth < 1 else 5 if depth > 5 else depth
-        hiddenDims = 8 if hiddenDims < 8 else 256 if hiddenDims > 256 else hiddenDims
-        queryDims = 8 if queryDims < 8 else 256 if queryDims > 256 else queryDims
-        inducingPoints = 1 if inducingPoints < 1 else 64 if inducingPoints > 64 else inducingPoints
-        return learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints
+    def training(self, sequence: int, hparams: HyperParams):
+        # Run the training in a manual subprocess of "train.py".
+        # This is implemented manually instead of using a ProcessPool due to spurious hanging with the latter.
 
-    def training1(self, sequence, hparams):
-        model, validationloss = self.training(sequence, hparams)
-        # model = model.to("cpu")  # for passing to parent process
-        return hparams, model, validationloss
+        scriptpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "train.py")
+        logpath = f"{self.logdir}/{self.title}/training_{self.iteration}_{sequence}.txt"
+        trainlosspath = f"{self.logdir}/{self.title}/trainloss_{self.iteration}_{sequence}.txt"
+        validationlosspath = f"{self.logdir}/{self.title}/validationloss_{self.iteration}_{sequence}.txt"
+        modelpath = f"{self.netdir}/{self.title}/model_{self.iteration}_{sequence}_{{}}.pth"
 
-    def training(self, sequence: int, hparams):
-        logfile = open(f"{self.logdir}/{self.title}/training_{self.iteration}_{sequence}.txt", "w")
-        trainlossfile = open(f"{self.logdir}/{self.title}/trainloss_{self.iteration}_{sequence}.txt", "w")
-        validationlossfile = open(f"{self.logdir}/{self.title}/validationloss_{self.iteration}_{sequence}.txt", "w")
+        args = [
+            "python3", scriptpath,
+            self.listfile, self.featuredir, "-f", self.featurename,
+            "--lowmemory",  # we cannot have every worker load the huge dataset
+            "--outfile", modelpath,
+            "--trainlossfile", trainlosspath,
+            "--validationlossfile", validationlosspath,
+            "--batch-size", str(self.batchSize),
+            "--steps", str(self.steps),
+            "--epochs", str(self.epochs),
+            "--learningrate", str(hparams.learningrate),
+            "--lrdecay", str(hparams.lrdecay),
+            "--patience", str(self.patience),
+            "--tau-ratings", str(hparams.tauRatings),
+            "--tau-l2", str(hparams.tauL2),
+            "--depth", str(hparams.depth),
+            "--hidden-dims", str(hparams.hiddenDims),
+            "--query-dims", str(hparams.queryDims),
+            "--inducing-points", str(hparams.inducingPoints)]
 
-        learningrate, lrdecay, windowSize, depth, hiddenDims, queryDims, inducingPoints = hparams
-        self.logMessage(logfile, f"HP Search it{self.iteration} seq{sequence} | lr={learningrate} decay={lrdecay} " +
-            f"N={windowSize} l={depth} d={hiddenDims} dq={queryDims} m={inducingPoints}")
+        # before starting training, clean previous results
+        modelpath = modelpath.replace("{}", "")  # best validationloss model by subprocess
+        os.path.exists(validationlosspath) and os.remove(validationlosspath)
+        os.path.exists(modelpath) and os.remove(modelpath)
 
-        # trainData = MovesDataset(self.listfile, self.featuredir, "T", featurename=self.featurename)
-        # validationData = MovesDataset(self.listfile, self.featuredir, "V", featurename=self.featurename)
-        trainData = self.trainData
-        validationData = self.validationData
-        validationLoader = MovesDataLoader(windowSize, validationData, batch_size=self.batchSize)
-        model = StrengthNet(trainData.featureDims, depth, hiddenDims, queryDims, inducingPoints)
-        model = model.to(device)
+        # run training to the end
+        with open(logpath, "w") as logfile:
+            self.logMessage(logfile, f"HP Search it{self.iteration} seq{sequence} | {hparams}")
+            process = subprocess.Popen(args, stdout=logfile)
+        process.wait()
 
-        def callback(model, e, trainloss, validationloss):
-            self.epochResult(model, sequence, e, trainloss, validationloss, logfile, trainlossfile, validationlossfile)
+        # find min validationloss from file written by subprocess
+        assert os.path.exists(validationlosspath), f"Loss file by training process not found: {validationlosspath}"
+        assert os.path.exists(modelpath), f"Model file by training process not found: {modelpath}"
 
-        tparams = TrainingParams(epochs=self.epochs, steps=self.steps, batchSize=self.batchSize,
-                                 learningrate=learningrate, lrdecay=lrdecay, windowSize=windowSize,
-                                 patience=self.patience, tau_ratings=None, tau_l2=None)
-        t = Training(callback, trainData, validationLoader, tparams)
-        model, validationloss = t.run(model)
+        with open(validationlosspath, "r") as file:
+            validationloss = min(float(line.split(',')[0]) for line in file if line.strip())
 
-        logfile.close()
-        trainlossfile.close()
-        validationlossfile.close()
-        return model, validationloss
-
-    def epochResult(self, model, sequence: int, e: int,
-            trainloss, validationloss, logfile, trainlossfile, validationlossfile):
-        if trainloss:
-            lt_score, lt_ratings, lt_l2 = trainloss[-1]
-            lt = lt_score + lt_ratings + lt_l2
-        else:
-            lt = lt_score = lt_ratings = lt_l2 = float("inf")
-        lv_score, lv_ratings = validationloss
-        self.logMessage(logfile, f"\tEpoch {e} error: training {lt_score:>8f}(s) + {lt_ratings:>8f}(r) + {lt_l2:>8f}(L2) = {lt:>8f}, validation {lv_score:>8f}(s), {lv_ratings:>8f}(r)")
-
-        validationlossfile.write(f"{lv_score},{lv_ratings}\n")
-        for (lt_score, lt_ratings, lt_l2) in trainloss:
-            trainlossfile.write(f"{lt_score},{lt_ratings},{lt_l2}\n")
-
-        modelfile = f"{self.netdir}/{self.title}/model_{self.iteration}_{sequence}_{e}.pth"
-        model.save(modelfile)
+        print(f"Validation loss it{self.iteration} seq{sequence}: {validationloss}")
+        return hparams, modelpath, validationloss
 
     def logMessage(self, logfile, message):
         print(message)
@@ -235,6 +235,7 @@ if __name__ == "__main__":
     optional_args.add_argument("-b", "--batch-size", help="Minibatch size", type=int, default=100, required=False)
     optional_args.add_argument("-t", "--steps", help="Number of batches per epoch", type=int, default=100, required=False)
     optional_args.add_argument("-e", "--epochs", help="Nr of training epochs", type=int, default=5, required=False)
+    optional_args.add_argument("-w", "--workers", help="Nr of concurrent worker processes", type=int, default=1, required=False)
     optional_args.add_argument("-p", "--patience", help="Epochs without improvement before early stop", type=int, default=3, required=False)
     optional_args.add_argument("-s", "--samples", help="Nr of training runs per iteration", type=int, default=15, required=False)
     optional_args.add_argument("-i", "--broad-iterations", help="Nr of broad hyperparameter search iterations", type=int, default=2, required=False)

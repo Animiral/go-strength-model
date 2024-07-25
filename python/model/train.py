@@ -19,6 +19,7 @@ def main(args):
     listfile = args["listfile"]
     featuredir = args["featuredir"]
     featurename = args["featurename"]
+    lowmemory = args["lowmemory"]
     outfile = args["outfile"]
     trainlossfile = args["trainlossfile"]
     validationlossfile = args["validationlossfile"]
@@ -29,10 +30,9 @@ def main(args):
     learningrate = args["learningrate"]
     lrdecay = args["lrdecay"]
     patience = args["patience"]
-    tau_ratings = args["tau_ratings"]
-    tau_l2 = args["tau_l2"]
+    tauRatings = args["tau_ratings"]
+    tauL2 = args["tau_l2"]
 
-    windowSize = args["window_size"]
     depth = args["depth"]
     hiddenDims = args["hidden_dims"]
     queryDims = args["query_dims"]
@@ -47,9 +47,9 @@ def main(args):
     if validationlossfile:
         validationlossfile = open(validationlossfile, "w")
 
-    trainData = MovesDataset(listfile, featuredir, "T", featurename=featurename)
-    validationData = MovesDataset(listfile, featuredir, "V", featurename=featurename)
-    validationLoader = MovesDataLoader(windowSize, validationData, batch_size=batchSize)
+    trainData = MovesDataset(listfile, featuredir, "T", featurename=featurename, featurememory=not lowmemory)
+    validationData = MovesDataset(listfile, featuredir, "V", featurename=featurename, featurememory=not lowmemory)
+    validationLoader = MovesDataLoader(validationData, batch_size=batchSize)
     model = StrengthNet(trainData.featureDims, depth, hiddenDims, queryDims, inducingPoints)
     model = model.to(device)
 
@@ -73,8 +73,8 @@ def main(args):
             model.save(modelfile)
 
     tparams = TrainingParams(epochs=epochs, steps=steps, batchSize=batchSize,
-        learningrate=learningrate, lrdecay=lrdecay, windowSize=windowSize, patience=patience,
-        tau_ratings=tau_ratings, tau_l2=tau_l2)
+        learningrate=learningrate, lrdecay=lrdecay, patience=patience,
+        tauRatings=tauRatings, tauL2=tauL2)
     t = Training(callback, trainData, validationLoader, tparams)
     bestmodel, validationloss = t.run(model)
 
@@ -89,31 +89,36 @@ def main(args):
     validationlossfile and validationlossfile.close()
 
 class StrengthNetLoss:
-    def __init__(self, parameters, tau_ratings=None, tau_l2=None):
-        if tau_ratings is None:
-            # default: being off by 200 Glicko-2 points in both bpred and wpred is
-            # as bad as getting the score half wrong.
-            tau_ratings = -math.log(.5) / 2*(200/MovesDataset.GLICKO2_STDEV)**2
-        if tau_l2 is None:
-            # default: every parameter == 1 is as bad as getting the score half wrong.
-            parameters = list(parameters)
-            tau_l2 = -math.log(.5) / float(sum(p.numel() for p in parameters if p.requires_grad))
 
-        self.parameters = parameters
-        self.tau_ratings = tau_ratings
-        self.tau_l2 = tau_l2
+    # being off by 500 Glicko-2 points in both bpred and wpred is
+    # as bad as getting the score half wrong.
+    DEFAULT_TAU_RATINGS = -math.log(.5) / (2*(500/MovesDataset.GLICKO2_STDEV)**2)
+    # all parameter == 1 is as bad as getting the score half wrong.
+    DEFAULT_TAU_L2 = -math.log(.5)
+
+    def __init__(self, model, tauRatings=None, tauL2=None):
+        if tauRatings is None:
+            tauRatings = StrengthNetLoss.DEFAULT_TAU_RATINGS
+        if tauL2 is None:
+            tauL2 = StrengthNetLoss.DEFAULT_TAU_L2
+
+        self.model = model
+        self.parametersCount = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        self.tauRatings = tauRatings
+        self.tauL2 = tauL2
         self.mse = nn.MSELoss()
 
     def trainLoss(self, bpred, wpred, by, wy, score):
         l_score = -(1 - (score - bradley_terry_score(bpred, wpred)).abs_()).log_().sum()
         l_ratings = self.mse(bpred, by) + self.mse(wpred, wy)
-        l_l2 = sum(p.pow(2).sum() for p in self.parameters)
-        return l_score, self.tau_ratings * l_ratings, self.tau_l2 * l_l2
+        l_l2 = sum(p.pow(2).sum() for p in self.model.parameters()) / self.parametersCount
+        return l_score, self.tauRatings * l_ratings, self.tauL2 * l_l2
 
     def validationLoss(self, bpred, wpred, by, wy, score):
         l_score = -(1 - (score - bradley_terry_score(bpred, wpred)).abs_()).log_().sum()
         l_ratings = self.mse(bpred, by) + self.mse(wpred, wy)
-        return l_score, self.tau_ratings * l_ratings
+        return l_score, self.tauRatings * l_ratings
+
 @dataclass
 class TrainingParams:
     epochs: int
@@ -121,10 +126,9 @@ class TrainingParams:
     batchSize: int
     learningrate: float
     lrdecay: float
-    windowSize: int
     patience: int
-    tau_ratings: float
-    tau_l2: float
+    tauRatings: float
+    tauL2: float
 
 class Training:
     """Implements the training loop, which can be run with different hyperparameters."""
@@ -139,7 +143,7 @@ class Training:
     def run(self, model):
         optimizer = torch.optim.Adam(model.parameters(), lr=self.tparams.learningrate)
         scheduler = StepLR(optimizer, step_size=1, gamma=1/self.tparams.lrdecay)
-        loss = StrengthNetLoss(model.parameters(), self.tparams.tau_ratings, self.tparams.tau_l2)
+        loss = StrengthNetLoss(model, self.tparams.tauRatings, self.tparams.tauL2)
         bestmodel = copy.deepcopy(model)
         bestloss = float("inf")
         badEpochs = 0
@@ -169,7 +173,7 @@ class Training:
         num_samples = self.tparams.steps*self.tparams.batchSize
         rndsampler = RandomSampler(self.trainData, replacement=True, num_samples=num_samples)
         sampler = BatchSampler(rndsampler, self.tparams.batchSize, False)
-        loader = MovesDataLoader(self.tparams.windowSize, self.trainData, batch_sampler=sampler)
+        loader = MovesDataLoader(self.trainData, batch_sampler=sampler)
 
         model.train()
         trainloss = []
@@ -227,6 +231,8 @@ if __name__ == "__main__":
     required_args.add_argument("listfile", help="CSV file listing games and labels")
     required_args.add_argument("featuredir", help="Directory containing extracted features")
     optional_args.add_argument("-f", "--featurename", help="Type of features to train on", type=str, default="pick", required=False)
+    optional_args.add_argument("-m", "--lowmemory", help="Do not keep entire dataset in memory", action="store_true", required=False)
+    optional_args.add_argument("-a", "--animation", help="Visualize the training process using continuously updating plots", action="store_true", required=False)
     optional_args.add_argument("-o", "--outfile", help="Pattern for model output, with epoch placeholder \"{}\" ", type=str, required=False)
     optional_args.add_argument("--trainlossfile", help="Output file to store training loss values", type=str, required=False)
     optional_args.add_argument("--validationlossfile", help="Output file to store validation loss values", type=str, required=False)
@@ -238,7 +244,6 @@ if __name__ == "__main__":
     optional_args.add_argument("-p", "--patience", help="Epochs without improvement before early stop", type=int, default=3, required=False)
     optional_args.add_argument("--tau-ratings", help="Scaling factor for rating labels MSE", type=float, default=None, required=False)
     optional_args.add_argument("--tau-l2", help="Scaling factor for parameter regularization", type=float, default=None, required=False)
-    optional_args.add_argument("-w", "--window-size", help="Maximum number of recent moves", type=int, default=500, required=False)
     optional_args.add_argument("-D", "--depth", help="Number of consecutive attention blocks in model", type=int, default=1, required=False)
     optional_args.add_argument("-H", "--hidden-dims", help="Hidden feature dimensionality", type=int, default=8, required=False)
     optional_args.add_argument("-Q", "--query-dims", help="Query feature dimensionality", type=int, default=8, required=False)

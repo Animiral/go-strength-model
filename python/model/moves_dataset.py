@@ -49,9 +49,21 @@ class MovesDataset(Dataset):
 
     def __init__(self, listpath: str, featuredir: str, marker: str, *,
       featurename: str = "pick", sparse: bool = True, featurememory: bool = True):
+        """
+        Load the dataset records from the CSV file at `listpath`.
+
+        Args:
+            listpath: Path to the file listing all the games
+            featuredir: Directory where precomputed move features must be available
+            marker: The set to operate on: "T": training, "V": validation, "E": test
+
+        Keyword Args:
+            featurename: Name of the feature set to use.
+            sparse: Only keep rows that match the set marker.
+            featurememory: If True, keep features in memory.
+        """
         self.featuredir = featuredir
         self.players: Dict[str, GameEntry] = {}  # stores last occurrence of player
-        self.games = List[GameEntry]
 
         with open(listpath, "r") as listfile:
             reader = csv.DictReader(listfile)
@@ -116,10 +128,19 @@ class MovesDataset(Dataset):
                 self.features[(featurePath, featureName)] = features
             return features
 
+    def preload(self):
+        """
+        Load all marked game features of self.featureName into feature memory for faster access.
+        """
+        if self.features is not None:
+            for game in self.marked:
+                self.loadRecentMoves("Black", game)
+                self.loadRecentMoves("White", game)
+
     def _findFeatureDims(self):
         """Discover feature dimensions by loading recent move data, assuming they are consistent."""
         self.featureDims = -1  # this causes reshape() in loadRecentMoves to guess
-        for game in self.games:
+        for game in self.marked:
             try:
                 data = self.loadRecentMoves('Black', game)
             except FileNotFoundError:
@@ -145,13 +166,6 @@ class MovesDataset(Dataset):
         else:
             print(f"Warning! Undecided game in dataset: {row['File']}")
             return 0.5  # Jigo and undecided cases
-
-    @staticmethod
-    def _isSelected(self, row, setmarker):
-        if "Set" in row.keys() and "*" != setmarker:
-            return setmarker == row["Set"]
-        else:
-            return True
 
     def _makePlayerGameEntry(self, row, color):
         name = row["Player " + color]
@@ -185,15 +199,12 @@ def load_features_from_zip(path: str, featureName: str, featureDims: int = -1):
 
     return torch.tensor(data).reshape(movecount, featureDims)
 
-
 class MovesDataLoader(DataLoader):
-    def __init__(self, windowSize, *args, **kwargs):
-        self.windowSize = windowSize
+    def __init__(self, *args, **kwargs):
         kwargs["collate_fn"] = self.pad_collate
         super().__init__(*args, **kwargs)
 
     def pad_collate_one(self, rs):
-        rs = [r[-self.windowSize:] for r in rs]       # clip to spec size
         lens = [r.shape[0] for r in rs]               # get lengths
         rs = [r for r in rs if len(r) > 0]            # remove empties
         collated = torch.cat(rs, dim=0) if rs else torch.empty((0,0))
