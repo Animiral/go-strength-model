@@ -9,9 +9,12 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, RandomSampler, BatchSampler
+from torch.optim.lr_scheduler import StepLR
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 from moves_dataset import MovesDataset, MovesDataLoader, bradley_terry_score
 from strengthnet import StrengthNet
-from torch.optim.lr_scheduler import StepLR
+from plots import trainingprogress
 
 device = "cuda"
 
@@ -20,6 +23,7 @@ def main(args):
     featuredir = args["featuredir"]
     featurename = args["featurename"]
     lowmemory = args["lowmemory"]
+    animation = args["animation"]
     outfile = args["outfile"]
     trainlossfile = args["trainlossfile"]
     validationlossfile = args["validationlossfile"]
@@ -53,40 +57,40 @@ def main(args):
     model = StrengthNet(trainData.featureDims, depth, hiddenDims, queryDims, inducingPoints)
     model = model.to(device)
 
-    def callback(model, e, trainloss, validationloss):
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        if trainloss:
-            lt_score, lt_ratings, lt_l2 = trainloss[-1]
-            lt = lt_score + lt_ratings + lt_l2
-        else:
-            lt = lt_score = lt_ratings = lt_l2 = float("inf")
-        lv_score, lv_ratings = validationloss
-        print(f"[{timestamp}] Epoch {e} error: training {lt_score:>8f}(s) + {lt_ratings:>8f}(r) + {lt_l2:>8f}(L2) = {lt:>8f}, validation {lv_score:>8f}(s), {lv_ratings:>8f}(r)")
+    if animation:
+        plt.ion()
+        fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+    else:
+        fig, axs = None, None
 
-        if validationlossfile:
-            validationlossfile.write(f"{lv_score},{lv_ratings}\n")
-        if trainlossfile and trainloss:
-            for (lt_score, lt_ratings, lt_l2) in trainloss:
-                trainlossfile.write(f"{lt_score},{lt_ratings},{lt_l2}\n")
-        if outfile:
-            modelfile = outfile.replace("{}", str(e+1))
-            model.save(modelfile)
+    def callback(model, epoch, trainlosses, validationlosses):
+        log_progress(validationlossfile, trainlossfile, epoch, trainlosses, validationlosses)
+        save_model(model, outfile, epoch)
+        display(fig, axs, model, epoch, trainlosses, validationlosses)
 
-    tparams = TrainingParams(epochs=epochs, steps=steps, batchSize=batchSize,
-        learningrate=learningrate, lrdecay=lrdecay, patience=patience,
-        tauRatings=tauRatings, tauL2=tauL2)
-    t = Training(callback, trainData, validationLoader, tparams)
-    bestmodel, validationloss = t.run(model)
+    tparams = TrainingParams(
+        epochs=epochs,
+        steps=steps,
+        batchSize=batchSize,
+        learningrate=learningrate,
+        lrdecay=lrdecay,
+        patience=patience,
+        tauRatings=tauRatings,
+        tauL2=tauL2)
+    training = Training(model, trainData, validationLoader, tparams)
+    bestmodel, bestloss, trainlosses, validationlosses = training.run(callback)
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"\t[{timestamp}] Training done, best validation loss: {validationloss}")
+    print(f"\t[{timestamp}] Training done, best validation loss: {bestloss}")
 
-    if outfile:
-        modelfile = outfile.replace("{}", "")
-        model.save(modelfile)
+    save_model(bestmodel, outfile)
 
     trainlossfile and trainlossfile.close()
     validationlossfile and validationlossfile.close()
+
+    if animation:
+        plt.ioff()
+        plt.show()  # block to show final charts
 
 class StrengthNetLoss:
 
@@ -131,31 +135,44 @@ class TrainingParams:
     tauL2: float
 
 class Training:
-    """Implements the training loop, which can be run with different hyperparameters."""
+    """Implements the training components, which can be configured with different hyperparameters."""
 
-    def __init__(self, callback, trainData: MovesDataset, validationLoader: MovesDataLoader, tparams: TrainingParams):
-        self.callback = callback
+    def __init__(self, model, trainData: MovesDataset, validationLoader: MovesDataLoader, tparams: TrainingParams):
+        # general data and parameters
         self.trainData = trainData
         self.validationLoader = validationLoader
         self.tparams = tparams
-        self.badEpochs = 0  # early stopping counter until patience runs out
 
-    def run(self, model):
-        optimizer = torch.optim.Adam(model.parameters(), lr=self.tparams.learningrate)
-        scheduler = StepLR(optimizer, step_size=1, gamma=1/self.tparams.lrdecay)
-        loss = StrengthNetLoss(model, self.tparams.tauRatings, self.tparams.tauL2)
+        # training state
+        self.model = model
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=self.tparams.learningrate)
+        self.scheduler = StepLR(self.optimizer, step_size=1, gamma=1/self.tparams.lrdecay)
+        self.loss = StrengthNetLoss(model, self.tparams.tauRatings, self.tparams.tauL2)
+
+    def run(self, callback):
+        """Train the model for a number of epochs with early stopping and update callbacks"""
+        model = self.model
+        scheduler = self.scheduler
+
         bestmodel = copy.deepcopy(model)
         bestloss = float("inf")
-        badEpochs = 0
-        validationloss = self.validate(self.validationLoader, model, loss)
-        self.callback(model, 0, [], validationloss)
+        currentEpoch = 0
+        badEpochs = 0  # early stopping counter until patience runs out
+        trainlosses = []
+        validationlosses = []
+
+        validationlosses.append(self.validate())
+        # validationlosses.append((1, 1)) # skip initial validation for faster debugging
+        callback(model, 0, trainlosses, validationlosses)
 
         for e in range(self.tparams.epochs):
-            trainloss = self.epoch(model, optimizer, loss)
-            validationloss = self.validate(self.validationLoader, model, loss)
-            epochloss, _ = validationloss  # performance = score loss. we only have ratings loss for reference.
-            self.callback(model, e+1, trainloss, validationloss)
+            trainlosses += self.epoch()
+            validationloss = self.validate()
+            validationlosses.append(validationloss)
+            callback(model, e+1, trainlosses, validationlosses)
 
+            # stop early?
+            epochloss, _ = validationloss  # performance = score loss. we only have ratings loss for reference.
             if epochloss < bestloss:
                 bestmodel = copy.deepcopy(model)
                 bestloss = epochloss
@@ -167,13 +184,21 @@ class Training:
 
             scheduler.step()  # decay learning rate
 
-        return bestmodel, bestloss
+        return bestmodel, bestloss, trainlosses, validationlosses
 
-    def epoch(self, model, optimizer, loss):
-        num_samples = self.tparams.steps*self.tparams.batchSize
-        rndsampler = RandomSampler(self.trainData, replacement=True, num_samples=num_samples)
-        sampler = BatchSampler(rndsampler, self.tparams.batchSize, False)
-        loader = MovesDataLoader(self.trainData, batch_sampler=sampler)
+    def epoch(self, model = None, data = None, steps = 0, batchSize = 0, optimizer = None, loss = None):
+        """Train the model for one epoch"""
+        model = model or self.model
+        data = data or self.trainData
+        steps = steps or self.tparams.steps
+        batchSize = batchSize or self.tparams.batchSize
+        optimizer = optimizer or self.optimizer
+        loss = loss or self.loss
+
+        num_samples = steps*batchSize
+        rndsampler = RandomSampler(data, replacement=True, num_samples=num_samples)
+        sampler = BatchSampler(rndsampler, batchSize, False)
+        loader = MovesDataLoader(data, batch_sampler=sampler)
 
         model.train()
         trainloss = []
@@ -196,7 +221,12 @@ class Training:
 
         return trainloss
 
-    def validate(self, loader, model, loss):
+    def validate(self, loader = None, model = None, loss = None):
+        """Validation test the model"""
+        loader = loader or self.validationLoader
+        model = model or self.model
+        loss = loss or self.loss
+
         batches = len(loader)
         model.eval()
 
@@ -212,6 +242,41 @@ class Training:
         l_score /= batches
         l_ratings /= batches
         return l_score, l_ratings
+
+def log_progress(validationlossfile, trainlossfile, epoch, trainlosses, validationlosses):
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if trainlosses:
+        lt_score, lt_ratings, lt_l2 = trainlosses[-1]
+        lt = lt_score + lt_ratings + lt_l2
+    else:
+        lt = lt_score = lt_ratings = lt_l2 = float("inf")
+    lv_score, lv_ratings = validationlosses[-1]
+    print(f"[{timestamp}] Epoch {epoch} error: training {lt_score:>8f}(s) + {lt_ratings:>8f}(r) + {lt_l2:>8f}(L2) = {lt:>8f}, validation {lv_score:>8f}(s), {lv_ratings:>8f}(r)")
+
+    if validationlossfile:
+        validationlossfile.write(f"{lv_score},{lv_ratings}\n")
+    if trainlossfile and trainlosses:
+        for (lt_score, lt_ratings, lt_l2) in trainlosses:
+            trainlossfile.write(f"{lt_score},{lt_ratings},{lt_l2}\n")
+
+def save_model(model, outfile, epoch=None):
+    if outfile:
+        epochstr = "" if epoch is None else str(epoch+1) 
+        modelfile = outfile.replace("{}", epochstr)
+        model.save(modelfile)
+
+def display(fig, axs, model, epoch, trainlosses, validationlosses):
+    if fig is None:
+        return
+
+    # training progress
+    axs[0, 0].clear()
+    trainingprogress.setup(axs[0, 0])
+    trainingprogress.plot(axs[0, 0], trainlosses, validationlosses)
+
+    # This is required for the current plot to actually draw using Qt backend
+    fig.canvas.draw()
+    fig.canvas.flush_events()
 
 if __name__ == "__main__":
     description = """
