@@ -36,48 +36,52 @@ def read_csv(path):
 
   return ratings, scores
 
-def plot_ratings(x, y, modelname, setname):
-  plt.scatter(x, y, alpha=0.1)
-  minx = min(min(x), min(y))
-  maxx = max(max(x), max(y))
-  plt.plot([minx, maxx], [minx, maxx], linestyle="--", color="tab:cyan")
-  plt.xlabel("Rating")
-  plt.ylabel("Model")
-  plt.title(f"{modelname} vs Labels in {setname}")
-  plt.show()
+def setup_ratings(ax, modelname: str = "Model", setname: str = "Set"):
+  ax.set_xlabel("Rating")
+  ax.set_ylabel("Model")
+  ax.set_title(f"{modelname} vs Labels in {setname}")
 
-def plot_score(whitewins, blackwins, modelname, setname):
-  colors_left = plt.cm.RdYlGn_r(whitewins)
-  colors_right = plt.cm.RdYlGn(blackwins)
-  fig, (left, right) = plt.subplots(1, 2, figsize=(6, 4))
+def plot_ratings(ax, x, y):
+  minx = min(x) - 50
+  maxx = max(x) + 50
+  ax.set_xlim(minx, maxx)
+  ax.set_ylim(minx, maxx)
+  ax.scatter(x, y, alpha=0.1)
+  ax.plot([minx, maxx], [minx, maxx], linestyle="--", color="tab:cyan")
 
-  left.set_facecolor("beige")
-  left.scatter(range(len(whitewins)), whitewins, color=colors_left, label="White Wins", alpha=0.1)
-  left.set_xticks([])
-  left.set_ylabel("Est.Score")
-  left.set_title(f"White Wins", fontsize=12)
+def setup_score(ax_white, ax_black):
+  ax_white.set_facecolor("beige")
+  ax_white.set_xticks([])
+  ax_white.set_ylabel("Est.Score")
+  ax_white.set_title(f"White Wins", fontsize=12)
 
-  right.set_facecolor("dimgray")
-  right.scatter(range(len(blackwins)), blackwins, color=colors_right, label="Black Wins", alpha=0.1)
-  right.set_xticks([])
-  right.set_ylabel("Est.Score")
-  right.set_title(f"Black Wins", fontsize=12)
+  ax_black.set_facecolor("dimgray")
+  ax_black.set_xticks([])
+  ax_black.set_ylabel("Est.Score")
+  ax_black.set_title(f"Black Wins", fontsize=12)
 
-  fig.suptitle(f"{modelname} vs Outcomes in {setname}")
-  plt.tight_layout()
-  plt.show()
+def plot_score(ax_white, ax_black, whitewins, blackwins):
+  colors_white = plt.cm.RdYlGn_r(whitewins)
+  colors_black = plt.cm.RdYlGn(blackwins)
+  ax_white.scatter(range(len(whitewins)), whitewins, color=colors_white, label="White Wins", alpha=0.1)
+  ax_black.scatter(range(len(blackwins)), blackwins, color=colors_black, label="Black Wins", alpha=0.1)
 
 if __name__ == "__main__":
   path = sys.argv[1]
   modelname = sys.argv[2] if len(sys.argv) > 2 else "Model"
 
+  fig, axs = plt.subplots(2, 2, figsize=(12.8, 9.6))
+
+  # TODO: fix the loops to go back to having all figures
   print(f"Read data from {path}...")
   ratings, scores = read_csv(path)
   for setname, ratlist in ratings.items():
     setname = {"T": "Training Set", "V": "Validation Set", "E": "Test Set"}[setname]
     print(f"Preparing {setname} ratings...")
+
+    setup_ratings(axs[0, 0], modelname, setname)
     x, y = zip(*ratlist)
-    plot_ratings(x, y, modelname, setname)
+    plot_ratings(axs[0, 0], x, y)
 
   for setname, scolist in scores.items():
     setname = {"T": "Training Set", "V": "Validation Set", "E": "Test Set"}[setname]
@@ -85,4 +89,7 @@ if __name__ == "__main__":
 
     whitewins = sorted([s[1] for s in scolist if s[0] < 0.5])
     blackwins = sorted([s[1] for s in scolist if s[0] > 0.5])
-    plot_score(whitewins, blackwins, modelname, setname)
+    plot_score(axs[1, 0], axs[1, 1], whitewins, blackwins)
+
+  # plt.tight_layout()
+  plt.show()

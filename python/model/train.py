@@ -6,15 +6,17 @@ import copy
 import datetime
 import math
 from dataclasses import dataclass
+import numpy as np
 import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, RandomSampler, BatchSampler
 from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
-from moves_dataset import MovesDataset, MovesDataLoader, bradley_terry_score
+from moves_dataset import MovesDataset, MovesDataLoader, bradley_terry_score, scale_rating
 from strengthnet import StrengthNet
 from plots import trainingprogress
+from plots import estimate_vs_label
 
 device = "cuda"
 
@@ -63,10 +65,10 @@ def main(args):
     else:
         fig, axs = None, None
 
-    def callback(model, epoch, trainlosses, validationlosses):
+    def callback(model, epoch, trainlosses, validationlosses, record_v):
         log_progress(validationlossfile, trainlossfile, epoch, trainlosses, validationlosses)
         save_model(model, outfile, epoch)
-        display(fig, axs, model, epoch, trainlosses, validationlosses)
+        display(fig, axs, model, epoch, trainlosses, validationlosses, record_v)
 
     tparams = TrainingParams(
         epochs=epochs,
@@ -77,7 +79,7 @@ def main(args):
         patience=patience,
         tauRatings=tauRatings,
         tauL2=tauL2)
-    training = Training(model, trainData, validationLoader, tparams)
+    training = Training(model, trainData, validationLoader, tparams, animation)
     bestmodel, bestloss, trainlosses, validationlosses = training.run(callback)
 
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -123,6 +125,13 @@ class StrengthNetLoss:
         l_ratings = self.mse(bpred, by) + self.mse(wpred, wy)
         return l_score, self.tauRatings * l_ratings
 
+    def scoreSamples(self, bpred, wpred, score):
+        """Return the score estimate from the model's outputs, partitioned by actual winner"""
+        spred = bradley_terry_score(bpred, wpred)
+        spred_white = spred[score < 0.5]  # score predictions when white is the actual winner
+        spred_black = spred[score > 0.5]  # score predictions when black is the actual winner
+        return spred_white, spred_black
+
 @dataclass
 class TrainingParams:
     epochs: int
@@ -137,11 +146,12 @@ class TrainingParams:
 class Training:
     """Implements the training components, which can be configured with different hyperparameters."""
 
-    def __init__(self, model, trainData: MovesDataset, validationLoader: MovesDataLoader, tparams: TrainingParams):
+    def __init__(self, model, trainData: MovesDataset, validationLoader: MovesDataLoader, tparams: TrainingParams, animation: bool = False):
         # general data and parameters
         self.trainData = trainData
         self.validationLoader = validationLoader
         self.tparams = tparams
+        self.animation = animation  # if this is set, collect more data to display
 
         # training state
         self.model = model
@@ -161,21 +171,21 @@ class Training:
         trainlosses = []
         validationlosses = []
 
-        validationlosses.append(self.validate())
+        l_vs, l_vr, record_v = self.validate()
+        validationlosses.append((l_vs, l_vr))
         # validationlosses.append((1, 1)) # skip initial validation for faster debugging
-        callback(model, 0, trainlosses, validationlosses)
+        callback(model, 0, trainlosses, validationlosses, record_v)
 
         for e in range(self.tparams.epochs):
             trainlosses += self.epoch()
-            validationloss = self.validate()
-            validationlosses.append(validationloss)
-            callback(model, e+1, trainlosses, validationlosses)
+            l_vs, l_vr, record_v = self.validate()
+            validationlosses.append((l_vs, l_vr))
+            callback(model, e+1, trainlosses, validationlosses, record_v)
 
             # stop early?
-            epochloss, _ = validationloss  # performance = score loss. we only have ratings loss for reference.
-            if epochloss < bestloss:
+            if l_vs < bestloss:  # performance = score loss. we only have ratings loss for reference.
                 bestmodel = copy.deepcopy(model)
-                bestloss = epochloss
+                bestloss = l_vs
                 badEpochs = 0
             else:
                 badEpochs += 1
@@ -226,11 +236,18 @@ class Training:
         loader = loader or self.validationLoader
         model = model or self.model
         loss = loss or self.loss
+        animation = self.animation
 
         batches = len(loader)
         model.eval()
 
+        # all results
+        preds = []  # rank estimates by model
+        ys = []     # validation set rank labels
+        spreds_white = []  # score estimate when white wins
+        spreds_black = []  # score estimate when black wins
         l_score, l_ratings = 0, 0
+
         with torch.no_grad():
             for bx, wx, blens, wlens, by, wy, score in loader:
                 bx, by, wx, wy, score = map(lambda t: t.to(device), (bx, by, wx, wy, score))
@@ -239,9 +256,19 @@ class Training:
                 batchSize = len(score)
                 l_score += l_s.item() / batchSize
                 l_ratings += l_r.item() / batchSize
+                if animation:
+                    preds.append(bpred.cpu().numpy())
+                    preds.append(wpred.cpu().numpy())
+                    ys.append(wy.cpu().numpy())
+                    ys.append(by.cpu().numpy())
+                    spred_white, spred_black = loss.scoreSamples(bpred, wpred, score)
+                    spreds_white.append(spred_white.cpu().numpy())
+                    spreds_black.append(spred_black.cpu().numpy())
+
         l_score /= batches
         l_ratings /= batches
-        return l_score, l_ratings
+        preds, ys, spreds_white, spreds_black = map(np.concatenate, (preds, ys, spreds_white, spreds_black))
+        return l_score, l_ratings, (preds, ys, spreds_white, spreds_black)
 
 def log_progress(validationlossfile, trainlossfile, epoch, trainlosses, validationlosses):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -265,7 +292,7 @@ def save_model(model, outfile, epoch=None):
         modelfile = outfile.replace("{}", epochstr)
         model.save(modelfile)
 
-def display(fig, axs, model, epoch, trainlosses, validationlosses):
+def display(fig, axs, model, epoch, trainlosses, validationlosses, record_v):
     if fig is None:
         return
 
@@ -273,6 +300,18 @@ def display(fig, axs, model, epoch, trainlosses, validationlosses):
     axs[0, 0].clear()
     trainingprogress.setup(axs[0, 0])
     trainingprogress.plot(axs[0, 0], trainlosses, validationlosses)
+
+    # model vs labels
+    preds, ys, spreds_white, spreds_black = record_v
+    preds = scale_rating(preds)
+    ys = scale_rating(ys)
+    axs[0, 1].clear()
+    estimate_vs_label.setup_ratings(axs[0, 1], f"Epoch {epoch}", "Validation Set")
+    estimate_vs_label.plot_ratings(axs[0, 1], ys, preds)
+    axs[1, 0].clear()
+    axs[1, 1].clear()
+    estimate_vs_label.setup_score(axs[1, 0], axs[1, 1])
+    estimate_vs_label.plot_score(axs[1, 0], axs[1, 1], np.sort(spreds_white), np.sort(spreds_black))
 
     # This is required for the current plot to actually draw using Qt backend
     fig.canvas.draw()
