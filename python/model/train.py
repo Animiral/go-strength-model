@@ -17,6 +17,7 @@ from moves_dataset import MovesDataset, MovesDataLoader, bradley_terry_score, sc
 from strengthnet import StrengthNet
 from plots import trainingprogress
 from plots import estimate_vs_label
+from plots import netvis
 
 device = "cuda"
 
@@ -61,14 +62,19 @@ def main(args):
 
     if animation:
         plt.ion()
-        fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+        fig, axs = plt.subplots(2, 5, figsize=(20, 9.6))
+
+        emb_lines = netvis.setup_embeddings(axs[1, 0], model)
+        act_alines, act_hlines = netvis.setup_activations(axs[1, 1], axs[1, 2], model)
+        grad_alines, grad_hlines = netvis.setup_gradients(axs[1, 3], axs[1, 4], model)
+        figlines = (emb_lines, act_alines, act_hlines, grad_alines, grad_hlines)
     else:
         fig, axs = None, None
 
     def callback(model, epoch, trainlosses, validationlosses, record_v):
         log_progress(validationlossfile, trainlossfile, epoch, trainlosses, validationlosses)
         save_model(model, outfile, epoch)
-        display(fig, axs, model, epoch, trainlosses, validationlosses, record_v)
+        display(fig, axs, figlines, model, epoch, trainlosses, validationlosses, record_v)
 
     tparams = TrainingParams(
         epochs=epochs,
@@ -265,6 +271,12 @@ class Training:
                     spreds_white.append(spred_white.cpu().numpy())
                     spreds_black.append(spred_black.cpu().numpy())
 
+        # if animation:
+        #     # get model gradients
+        #     model.retain_grads()
+        #     l = l_s + l_r
+        #     l.backward()
+
         l_score /= batches
         l_ratings /= batches
         preds, ys, spreds_white, spreds_black = map(np.concatenate, (preds, ys, spreds_white, spreds_black))
@@ -292,7 +304,7 @@ def save_model(model, outfile, epoch=None):
         modelfile = outfile.replace("{}", epochstr)
         model.save(modelfile)
 
-def display(fig, axs, model, epoch, trainlosses, validationlosses, record_v):
+def display(fig, axs, figlines, model, epoch, trainlosses, validationlosses, record_v):
     if fig is None:
         return
 
@@ -308,12 +320,19 @@ def display(fig, axs, model, epoch, trainlosses, validationlosses, record_v):
     axs[0, 1].clear()
     estimate_vs_label.setup_ratings(axs[0, 1], f"Epoch {epoch}", "Validation Set")
     estimate_vs_label.plot_ratings(axs[0, 1], ys, preds)
-    axs[1, 0].clear()
-    axs[1, 1].clear()
-    estimate_vs_label.setup_score(axs[1, 0], axs[1, 1])
-    estimate_vs_label.plot_score(axs[1, 0], axs[1, 1], np.sort(spreds_white), np.sort(spreds_black))
+    axs[0, 2].clear()
+    axs[0, 3].clear()
+    estimate_vs_label.setup_score(axs[0, 2], axs[0, 3])
+    estimate_vs_label.plot_score(axs[0, 2], axs[0, 3], np.sort(spreds_white), np.sort(spreds_black))
+
+    # net visualization
+    emb_lines, act_alines, act_hlines, grad_alines, grad_hlines = figlines
+    netvis.plot_embeddings(axs[1, 0], emb_lines, model)
+    netvis.plot_activations(axs[1, 1], axs[1, 2], act_alines, act_hlines, model)
+    netvis.plot_gradients(axs[1, 3], axs[1, 4], grad_alines, grad_hlines, model)
 
     # This is required for the current plot to actually draw using Qt backend
+    plt.tight_layout()
     fig.canvas.draw()
     fig.canvas.flush_events()
 

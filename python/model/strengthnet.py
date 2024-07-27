@@ -62,6 +62,9 @@ class StrengthNet(nn.Module):
         h_grads = []
         for layer in self.enc.layers:
             if isinstance(layer, ISAB):
+                if layer.ab0.at.a.grad is None:
+                    return None  # no backward pass data
+
                 a = torch.cat((layer.ab0.at.a.grad.flatten(), layer.ab1.at.a.grad.flatten()))
                 a_grads.append(a)
                 hres = torch.cat((layer.ab0.hres.grad.flatten(), layer.ab1.hres.grad.flatten()))
