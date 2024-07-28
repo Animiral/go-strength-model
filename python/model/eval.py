@@ -3,7 +3,7 @@
 
 import argparse
 import torch
-from moves_dataset import MovesDataset, scale_rating
+from moves_dataset import MovesDataset, bradley_terry_score, scale_rating
 from strengthnet import StrengthNet
 
 device = "cuda"
@@ -29,17 +29,14 @@ def main(args):
 
     data.write(outfile)
 
-def glicko_score(black_rating: float, white_rating: float) -> float:
-    return 1 / (1 + (10 ** ((white_rating - black_rating) / 400)))
-
 def evaluate(data: MovesDataset, i: int, model: StrengthNet):
     model.eval()
     with torch.no_grad():
         bx, wx, _, _, _ = data[i]
         bx, wx = bx.to(device), wx.to(device)
         bpred, wpred = model(bx).item(), model(wx).item()
+        spred = bradley_terry_score(bpred, wpred)
         bpred, wpred = scale_rating(bpred), scale_rating(wpred)
-        spred = glicko_score(bpred, wpred)
     return bpred, wpred, spred
 
 if __name__ == "__main__":

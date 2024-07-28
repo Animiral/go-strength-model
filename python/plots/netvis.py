@@ -149,7 +149,6 @@ def plot_activations(a_ax, h_ax, alines, hlines, model):
 def plot_gradients(a_ax, h_ax, alines, hlines, model):
   grads = model.grads()
   if grads is None:
-    print("grads are None")
     return  # do not plot if model has no backprop data
 
   a_grads, h_grads = grads

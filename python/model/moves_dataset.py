@@ -217,7 +217,7 @@ class MovesDataLoader(DataLoader):
         brating, wrating, score = map(torch.Tensor, (brating, wrating, score))
         return brecent, wrecent, blens, wlens, brating, wrating, score
 
-def bradley_terry_score(black_rating, white_rating):
+def bradley_terry_score(black_rating: float, white_rating: float) -> float:
     """Estimate the match score between two ratings determined by model output (same scale as labels)"""
     scale = MovesDataset.GLICKO2_STDEV
     return 1 / (1 + (10 ** ((white_rating - black_rating) * scale / 400)))

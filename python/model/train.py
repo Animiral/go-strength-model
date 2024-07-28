@@ -6,6 +6,7 @@ import copy
 import datetime
 import math
 from dataclasses import dataclass
+import pickle
 import numpy as np
 import torch
 from torch import nn
@@ -30,6 +31,7 @@ def main(args):
     outfile = args["outfile"]
     trainlossfile = args["trainlossfile"]
     validationlossfile = args["validationlossfile"]
+    figdir = args["figdir"]
 
     batchSize = args["batch_size"]
     steps = args["steps"]
@@ -74,7 +76,7 @@ def main(args):
     def callback(model, epoch, trainlosses, validationlosses, record_v):
         log_progress(validationlossfile, trainlossfile, epoch, trainlosses, validationlosses)
         save_model(model, outfile, epoch)
-        display(fig, axs, figlines, model, epoch, trainlosses, validationlosses, record_v)
+        display(fig, axs, figlines, model, epoch, trainlosses, validationlosses, record_v, figdir)
 
     tparams = TrainingParams(
         epochs=epochs,
@@ -121,13 +123,13 @@ class StrengthNetLoss:
         self.mse = nn.MSELoss()
 
     def trainLoss(self, bpred, wpred, by, wy, score):
-        l_score = -(1 - (score - bradley_terry_score(bpred, wpred)).abs_()).log_().sum()
+        l_score = -(1 - (score - bradley_terry_score(bpred, wpred)).abs_()).log_().mean()
         l_ratings = self.mse(bpred, by) + self.mse(wpred, wy)
         l_l2 = sum(p.pow(2).sum() for p in self.model.parameters()) / self.parametersCount
         return l_score, self.tauRatings * l_ratings, self.tauL2 * l_l2
 
     def validationLoss(self, bpred, wpred, by, wy, score):
-        l_score = -(1 - (score - bradley_terry_score(bpred, wpred)).abs_()).log_().sum()
+        l_score = -(1 - (score - bradley_terry_score(bpred, wpred)).abs_()).log_().mean()
         l_ratings = self.mse(bpred, by) + self.mse(wpred, wy)
         return l_score, self.tauRatings * l_ratings
 
@@ -229,10 +231,9 @@ class Training:
             optimizer.zero_grad()
 
             # keep track of loss
-            batchSize = len(score)
-            l_score = l_score.item() / batchSize
-            l_ratings = l_ratings.item() / batchSize
-            l_l2 = l_l2.item() / batchSize
+            l_score = l_score.item()
+            l_ratings = l_ratings.item()
+            l_l2 = l_l2.item()
             trainloss.append((l_score, l_ratings, l_l2))
 
         return trainloss
@@ -259,9 +260,8 @@ class Training:
                 bx, by, wx, wy, score = map(lambda t: t.to(device), (bx, by, wx, wy, score))
                 bpred, wpred = model(bx, blens), model(wx, wlens)
                 l_s, l_r = loss.validationLoss(bpred, wpred, by, wy, score)
-                batchSize = len(score)
-                l_score += l_s.item() / batchSize
-                l_ratings += l_r.item() / batchSize
+                l_score += l_s.item()
+                l_ratings += l_r.item()
                 if animation:
                     preds.append(bpred.cpu().numpy())
                     preds.append(wpred.cpu().numpy())
@@ -304,7 +304,7 @@ def save_model(model, outfile, epoch=None):
         modelfile = outfile.replace("{}", epochstr)
         model.save(modelfile)
 
-def display(fig, axs, figlines, model, epoch, trainlosses, validationlosses, record_v):
+def display(fig, axs, figlines, model, epoch, trainlosses, validationlosses, record_v, figdir):
     if fig is None:
         return
 
@@ -336,6 +336,11 @@ def display(fig, axs, figlines, model, epoch, trainlosses, validationlosses, rec
     fig.canvas.draw()
     fig.canvas.flush_events()
 
+    if figdir:
+        with open(f"{figdir}/epoch{epoch}.pkl", "wb") as f:
+            pickle.dump(fig, f)                         # for later re-loading if necessary
+        fig.savefig(f"{figdir}/epoch{epoch}.pdf")       # for offline viewing
+
 if __name__ == "__main__":
     description = """
     Train strength model on Go positions from dataset.
@@ -359,6 +364,7 @@ if __name__ == "__main__":
     optional_args.add_argument("-o", "--outfile", help="Pattern for model output, with epoch placeholder \"{}\" ", type=str, required=False)
     optional_args.add_argument("--trainlossfile", help="Output file to store training loss values", type=str, required=False)
     optional_args.add_argument("--validationlossfile", help="Output file to store validation loss values", type=str, required=False)
+    optional_args.add_argument("--figdir", help="Output directory to store figures that visualize training", type=str, required=False)
     optional_args.add_argument("-b", "--batch-size", help="Minibatch size", type=int, default=100, required=False)
     optional_args.add_argument("-t", "--steps", help="Number of batches per epoch", type=int, default=100, required=False)
     optional_args.add_argument("-e", "--epochs", help="Nr of training epochs", type=int, default=5, required=False)
