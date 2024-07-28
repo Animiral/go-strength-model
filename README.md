@@ -103,7 +103,11 @@ This will allocate 10000 rows to the training set, 5000 to the validation set an
 
 If not specified, the `--output` file defaults to the same as the `--input`, overwriting it with the added information.
 
-Rows that introduce a specific player for the first time in the dataset are generally not eligible for marking as any set, because these rows do not offer the necessary prior information for a model to predict the match outcome. The optional `--withNovice` switch disables this behavior, making all rows eligible for inclusion in one of the sets.
+Rows that introduce a specific player for the first time in the dataset are generally not eligible for marking as any set, because these rows do not offer the necessary prior information for a model to predict the match outcome. The optional `--with-novice` switch disables this behavior, making all rows eligible for inclusion in one of the sets.
+
+The script can also check for noisy rows and not mark these as training rows. Noisy rows are rows where both players do not have a minimum number of future games in the dataset, meaning that their label does not have future information from the Glicko-2 system and might be less accurate. The number of required future games is specified with the optional `--advance` parameter, just like in the section "Labeling Games" below. A row is also noisy if the labels disagree with the score (outcome). I.e. black wins against higher-rated white or vice-versa. The noise criteria should only be applied to a labeled dataset (see below) and thus are only used if `--advance` is specified.
+
+With the optional `--modify` switch, the existing set assignment will be kept as far as possible, keeping changes to a minimum.
 
 As an alternative usage, the splits can be specified as fractions. Omitting `--testPart` assigns all remaining rows to the test set.
 

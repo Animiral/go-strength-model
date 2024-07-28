@@ -1,4 +1,8 @@
+#!/usr/bin/env python3
 """
+Usage: random_split.py [-h] [-i INPUT_PATH] [-c COPYFROM_PATH] [--modify] [-o OUTPUT_PATH] [-t TRAININGPART] [-v VALIDATIONPART]
+                       [-e TESTPART] [--with-novice] [-a ADVANCE]
+
 Given an input file listing Go matches, split them into a training set,
 a validation set and a test set.
 The split amounts can be provided as arguments.
@@ -9,36 +13,160 @@ Output the evaluation results to a new file or the same file with the assignment
 """
 
 import argparse
+from enum import Enum
+from typing import Optional
+from dataclasses import dataclass
 import csv
 import random
 
-def eligibleRows(csvrows, modify: bool):
-    """Mask out rows where one player is new in the system, giving us no prior info."""
-    occurred = set()
-    mask = []
+# -----------------------------------------------
 
-    for row in csvrows:
-        white, black = row["Player White"], row["Player Black"]
-        if modify and "Set" in row and row["Set"] != "-":
-            mask.append(False)
-        elif white in occurred and black in occurred:
-            mask.append(True)
-        else:
-            mask.append(False)
-        occurred.add(white)
-        occurred.add(black)
+class Pool(Enum):
+    UNASSIGN = 0    # assign to no set
+    TRAINING = 1    # assign to training set
+    VALIDATION = 2  # assign to validation set
+    TEST = 3        # assign to test set
+    ELIGIBLE = 4    # non-novice rows that we can use in validation and test
+    TRAINABLE = 5   # low-noise rows that we can use in training set
 
-    return mask
+@dataclass
+class PoolRow:
+    row: dict
+    pool: Pool
 
-def countRows(csvrows, setmarker: str, excludeMask):
-    assert len(mask) == len(csvrows)
-    return sum(1 for i, row in enumerate(csvrows) if row["Set"] == setmarker and not excludeMask[i])
+def markEligibles(prows: list[PoolRow]):
+    """Find rows where both players are established in the system and put them in the eligible pool."""
+    players = set()
 
-def spread(markers, mask):
-    """Distribute shuffled markers over eligible rows."""
-    assert len(markers) == sum(mask)
-    it = iter(markers)
-    return ['-' if not el else next(it) for el in mask]
+    for prow in prows:
+        white, black = prow.row["Player White"], prow.row["Player Black"]
+        if white in players and black in players:
+            prow.pool = Pool.ELIGIBLE
+        players.add(white)
+        players.add(black)
+
+def markTrainables(prows: list[PoolRow], advance: Optional[int]):
+    """
+    Find rows which are suitable for training.
+    These are rows in which the labels must be established by a number of games
+    and they must agree with the score.
+    """
+    players = dict()
+
+    for prow in reversed(prows):
+        # update counts
+        white, black = prow.row["Player White"], prow.row["Player Black"]
+        wcount, bcount = players.get(white, 0), players.get(black, 0)
+        wcount += 1
+        bcount += 1
+        players[white] = wcount
+        players[black] = bcount
+
+        # check for trainable
+        if Pool.ELIGIBLE != prow.pool:
+            continue  # non-eligible rows are not suitable for training
+
+        if advance is None:
+            prow.pool = Pool.TRAINABLE  # all eligible rows are suitable for training
+            continue
+
+        if wcount <= advance or bcount <= advance:
+            continue  # not enough future history
+
+        score = float(prow.row["Score"])
+        wrating = float(prow.row["WhiteRating"])
+        brating = float(prow.row["BlackRating"])
+        if score < 0.5 and brating > wrating:
+            continue  # white wins, but black labeled stronger
+        if score > 0.5 and brating < wrating:
+            continue  # black wins, but white labeled stronger
+
+        prow.pool = Pool.TRAINABLE
+
+def spreadRandom(prows: list[PoolRow], source: Pool, dest: Pool, count: int):
+    """Randomly assign `count` rows from the `source` pool to the `dest` pool."""
+    print(f"Randomly assign {count} rows from {source} to {dest}.")
+    sourceCount = sum(source == prow.pool for prow in prows)
+    if count > sourceCount:
+        raise ValueError(f"Cannot mark {count} {source} rows as {dest}: only {sourceCount} available.")
+
+    markers = [dest]*count + [source]*(sourceCount-count)
+    random.shuffle(markers)
+    markers = iter(markers)
+
+    for prow in prows:
+        if source == prow.pool:
+            prow.pool = next(markers)
+
+def split(rows: list[dict], modify: bool, trainingPart: float, validationPart: float, testPart: Optional[float], advance: Optional[int], withNovice: bool):
+    if withNovice:  # all rows are eligible
+        prows = [PoolRow(row=r, pool=Pool.ELIGIBLE) for r in rows]
+    else:
+        prows = [PoolRow(row=r, pool=Pool.UNASSIGN) for r in rows]
+        markEligibles(prows)
+
+    # determine number of assignments and to which set among eligible rows
+    eligibleCount = sum(Pool.ELIGIBLE == prow.pool for prow in prows)
+    if args.trainingPart < 1:
+        trainGoal = int(round(eligibleCount * args.trainingPart))
+    else:
+        trainGoal = int(args.trainingPart)
+    if args.validationPart < 1:
+        validationGoal = int(round(eligibleCount * args.validationPart))
+    else:
+        validationGoal = int(args.validationPart)
+    if args.testPart is None:
+        testGoal = eligibleCount - trainGoal - validationGoal
+    elif args.testPart < 1:
+        testGoal = int(round(eligibleCount * args.testPart))
+    else:
+        testGoal = int(args.testPart)
+
+    print(f"Randomly splitting {eligibleCount} eligible of {len(rows)} rows: {trainGoal} training, {validationGoal} validation, {testGoal} testing.")
+
+    # distribute training games among trainable rows
+    markTrainables(prows, advance)
+    print(f"Number of rows suitable for training: {sum(Pool.TRAINABLE == prow.pool for prow in prows)}.")
+    # remember training set assignments and go from there
+    for prow in prows:
+        if modify and Pool.TRAINABLE == prow.pool and "T" == prow.row["Set"]:
+            prow.pool = Pool.TRAINING
+    trainCount = sum(Pool.TRAINING == prow.pool for prow in prows)
+
+    if trainCount > trainGoal:
+        spreadRandom(prows, source=Pool.TRAINING, dest=Pool.TRAINABLE, count=trainCount - trainGoal)
+    if trainCount < trainGoal:
+        spreadRandom(prows, source=Pool.TRAINABLE, dest=Pool.TRAINING, count=trainGoal - trainCount)
+
+    # distribute validation&test games among eligible rows
+    for prow in prows:
+        if Pool.TRAINABLE == prow.pool:  # we don't care about trainable anymore; only about eligible
+            prow.pool = Pool.ELIGIBLE
+        if modify and Pool.ELIGIBLE == prow.pool and "V" == prow.row["Set"]:
+            prow.pool = Pool.VALIDATION
+        if modify and Pool.ELIGIBLE == prow.pool and "E" == prow.row["Set"]:
+            prow.pool = Pool.TEST
+    validationCount = sum(Pool.VALIDATION == prow.pool for prow in prows)
+    testCount = sum(Pool.TEST == prow.pool for prow in prows)
+
+    if validationCount > validationGoal:
+        spreadRandom(prows, source=Pool.VALIDATION, dest=Pool.ELIGIBLE, count=validationCount - validationGoal)
+    if validationCount < validationGoal:
+        spreadRandom(prows, source=Pool.ELIGIBLE, dest=Pool.VALIDATION, count=validationGoal - validationCount)
+    if testCount > testGoal:
+        spreadRandom(prows, source=Pool.TEST, dest=Pool.ELIGIBLE, count=testCount - testGoal)
+    if testCount < testGoal:
+        spreadRandom(prows, source=Pool.ELIGIBLE, dest=Pool.TEST, count=testGoal - testCount)
+
+    # assign set by pool (all remaining eligible rows become "-"s)
+    for prow in prows:
+        prow.row["Set"] = {
+            Pool.UNASSIGN: "-",
+            Pool.ELIGIBLE: "-",
+            Pool.TRAINING: "T",
+            Pool.VALIDATION: "V",
+            Pool.TEST: "E"
+        }[prow.pool]
 
 if __name__ == "__main__":
     description = """
@@ -59,8 +187,8 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-m", "--modify",
+        action="store_true",
         default=False,
-        type=bool,
         help="Adapt existing set assignments to the given numbers, changing as few rows as possible.",
     )
     parser.add_argument(
@@ -89,85 +217,43 @@ if __name__ == "__main__":
         required=False
     )
     parser.add_argument(
-        "-n", "--withNovice",
+        "-n", "--with-novice",
+        action="store_true",
         default=False,
-        type=bool,
         help="Mark even such records where (one of) the players occurs for the first time.",
+    )
+    parser.add_argument(
+        "-a", "--advance",
+        default=None,
+        type=int,
+        help="Require this number of future games for both players in training games.",
     )
     args = parser.parse_args()
     print(vars(args))
-
-    markerlookup = dict()
-    if args.copy:
-        with open(args.copy, 'r') as copyfile:
-            copyreader = csv.DictReader(copyfile)
-            copyrows = list(copyreader)
-            markerlookup = { r["File"] : r["Set"] for r in copyrows }
 
     # Input CSV format (title row):
     # File,Player White,Player Black,Winner
     with open(args.input, 'r') as infile:
         reader = csv.DictReader(infile)
         rows = list(reader)
-        infile.close()
 
     if args.copy:
+        markerlookup = dict()
+
+        with open(args.copy, 'r') as copyfile:
+            copyreader = csv.DictReader(copyfile)
+            copyrows = list(copyreader)
+            markerlookup = { r["File"] : r["Set"] for r in copyrows }
+
         assert not args.modify, "incompatible arguments: --copy and --modify"
         print(f"Copying training/validation/test set markers from {args.copy}.")
 
         for r in rows:
             r["Set"] = markerlookup.get(r["File"], "-")  # tolerate copy from small dataset to larger dataset
+        del markerlookup
     else:
-        trainingPart = args.trainingPart
-        validationPart = args.validationPart
-
-        # find all rows that we can mark
-        mask = [True] * len(rows) if args.withNovice else eligibleRows(rows, args.modify)
-        rowCount = sum(mask)
-
-        # determine how many assignments to which set among eligible rows
-        if args.trainingPart < 1:
-            trainCount = int(round(rowCount * args.trainingPart))
-        else:
-            trainCount = int(args.trainingPart)
-        if args.modify:
-            preexisting = countRows(csvrows, "T", mask)
-            assert preexisting <= trainCount, "Modification to reduce dataset size is not supported"
-            trainCount -= preexisting
-
-        if args.validationPart < 1:
-            validationCount = int(round(rowCount * args.validationPart))
-        else:
-            validationCount = int(args.validationPart)
-        if args.modify:
-            preexisting = countRows(csvrows, "V", mask)
-            assert preexisting <= validationCount, "Modification to reduce dataset size is not supported"
-            validationCount -= preexisting
-
-        if args.testPart is None:
-            testCount = rowCount - trainCount - validationCount
-        elif args.testPart < 1:
-            testCount = int(round(rowCount * args.testPart))
-        else:
-            testCount = int(args.testPart)
-        if args.modify:
-            preexisting = countRows(csvrows, "E", mask)
-            assert preexisting <= testCount, "Modification to reduce dataset size is not supported"
-            testCount -= preexisting
-
-        remainder = rowCount - trainCount - validationCount - testCount
-        if remainder < 0:
-            print(f"Not enough rows to mark them! T={trainCount}, V={validationCount}, E={testCount}, eligible rows={rowCount}/{len(rows)}")
-            exit()
-
-        print(f"Randomly splitting {rowCount} of {len(rows)} rows {trainingPart}/{validationPart}/...: {trainCount} training, {validationCount} validation, {testCount} testing.")
-
-        markers = list('T'*trainCount + 'V'*validationCount + 'E'*testCount + '-'*remainder)
-        random.shuffle(markers)
-        markers = spread(markers, mask)
-
-        for r, m in zip(rows, markers):
-            r["Set"] = m
+        print(f"Assigning set markers for {len(rows)} rows from {args.input}.")
+        split(rows, args.modify, args.trainingPart, args.validationPart, args.testPart, args.advance, args.with_novice)
 
     # write output CSV file
     outpath = args.output
