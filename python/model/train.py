@@ -12,13 +12,9 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset, DataLoader, RandomSampler, BatchSampler
 from torch.optim.lr_scheduler import StepLR
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+
 from moves_dataset import MovesDataset, MovesDataLoader, bradley_terry_score, scale_rating
 from strengthnet import StrengthNet
-from plots import trainingprogress
-from plots import estimate_vs_label
-from plots import netvis
 
 device = "cuda"
 
@@ -63,20 +59,22 @@ def main(args):
     model = model.to(device)
 
     if animation:
+        import matplotlib.pyplot as plt
         plt.ion()
         fig, axs = plt.subplots(2, 5, figsize=(20, 9.6))
+
+        from plots import netvis
 
         emb_lines = netvis.setup_embeddings(axs[1, 0], model)
         act_alines, act_hlines = netvis.setup_activations(axs[1, 1], axs[1, 2], model)
         grad_alines, grad_hlines = netvis.setup_gradients(axs[1, 3], axs[1, 4], model)
         figlines = (emb_lines, act_alines, act_hlines, grad_alines, grad_hlines)
-    else:
-        fig, axs = None, None
 
     def callback(model, epoch, trainlosses, validationlosses, record_v):
         log_progress(validationlossfile, trainlossfile, epoch, trainlosses, validationlosses)
         save_model(model, outfile, epoch)
-        display(fig, axs, figlines, model, epoch, trainlosses, validationlosses, record_v, figdir)
+        if animation:
+            display(fig, axs, figlines, model, epoch, trainlosses, validationlosses, record_v, figdir)
 
     tparams = TrainingParams(
         epochs=epochs,
@@ -104,11 +102,16 @@ def main(args):
 
 class StrengthNetLoss:
 
+    # Method 1: principle
     # being off by 500 Glicko-2 points in both bpred and wpred is
     # as bad as getting the score half wrong.
-    DEFAULT_TAU_RATINGS = -math.log(.5) / (2*(500/MovesDataset.GLICKO2_STDEV)**2)
+    # DEFAULT_TAU_RATINGS = -math.log(.5) / (2*(500/MovesDataset.GLICKO2_STDEV)**2)
     # all parameter == 1 is as bad as getting the score half wrong.
-    DEFAULT_TAU_L2 = -math.log(.5)
+    # DEFAULT_TAU_L2 = -math.log(.5)
+
+    # Method 2: approx 1:1:0.3 relation in practice
+    DEFAULT_TAU_RATINGS = 1.0
+    DEFAULT_TAU_L2 = 10.0
 
     def __init__(self, model, tauRatings=None, tauL2=None):
         if tauRatings is None:
@@ -279,7 +282,8 @@ class Training:
 
         l_score /= batches
         l_ratings /= batches
-        preds, ys, spreds_white, spreds_black = map(np.concatenate, (preds, ys, spreds_white, spreds_black))
+        if animation:  # np.concatenate doesn't work on empty lists
+            preds, ys, spreds_white, spreds_black = map(np.concatenate, (preds, ys, spreds_white, spreds_black))
         return l_score, l_ratings, (preds, ys, spreds_white, spreds_black)
 
 def log_progress(validationlossfile, trainlossfile, epoch, trainlosses, validationlosses):
@@ -305,8 +309,10 @@ def save_model(model, outfile, epoch=None):
         model.save(modelfile)
 
 def display(fig, axs, figlines, model, epoch, trainlosses, validationlosses, record_v, figdir):
-    if fig is None:
-        return
+    import matplotlib.pyplot as plt
+    from plots import trainingprogress
+    from plots import estimate_vs_label
+    from plots import netvis
 
     # training progress
     axs[0, 0].clear()

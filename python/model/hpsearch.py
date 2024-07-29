@@ -46,8 +46,8 @@ def main(args):
     workers = args["workers"]
     patience = args["patience"]
     samples = args["samples"]
-    broadIterations = args["broad_iterations"]
-    fineIterations = args["fine_iterations"]
+    iterations = args["iterations"]
+    decay = args["decay"]
 
     for k, v in args.items():
         print(f"{k}: {v}")
@@ -61,18 +61,14 @@ def main(args):
         logfile.write(f"[{timestamp}] {message}\n")
 
     search = HyperparamSearch(title, listfile, featuredir, featurename, netdir, logdir, workers, epochs, steps, batchSize, patience, samples)
-
+    scale = 1.0
     modelfile = None
 
-    for i in range(broadIterations):
-        logMessage(f"=== Hyperparameter Search: Broad Iteration {i} ===")
-        hparams, modelfile, validationloss = search.searchBroad()
+    for i in range(iterations):
+        logMessage(f"=== Hyperparameter Search: Iteration {i}, scale={scale} ===")
+        hparams, modelfile, validationloss = search.search(scale)
         logMessage(f"Best hparams (vloss={validationloss}) broad{i}: {hparams}")
-
-    for i in range(fineIterations):
-        logMessage(f"=== Hyperparameter Search: Fine Iteration {i} ===")
-        hparams, modelfile, validationloss = search.searchFine()
-        logMessage(f"Best hparams (vloss={validationloss}) fine{i}: {hparams}")
+        scale *= decay
 
     if modelfile:
         bestfile = f"{netdir}/{title}/model.pth"
@@ -107,12 +103,12 @@ class HyperparamSearch:
         self.trainingSamples = trainingSamples
         hparams = HyperParams(learningrate = 10**-3,
                               lrdecay = 0.98,
+                              tauRatings = StrengthNetLoss.DEFAULT_TAU_RATINGS,
+                              tauL2 = StrengthNetLoss.DEFAULT_TAU_L2,
                               depth = 3,
                               hiddenDims = 200,
                               queryDims = 40,
-                              inducingPoints = 40,
-                              tauRatings = StrengthNetLoss.DEFAULT_TAU_RATINGS,
-                              tauL2 = StrengthNetLoss.DEFAULT_TAU_L2)
+                              inducingPoints = 40)
         self.best = (hparams, None, float("inf"))
 
     def search(self, scale):
@@ -148,7 +144,7 @@ class HyperparamSearch:
         hparams.learningrate = 10**-5 if hparams.learningrate < 10**-5 else 1 if hparams.learningrate > 1 else hparams.learningrate
         hparams.lrdecay = 0.9 if hparams.lrdecay < 0.9 else 1 if hparams.lrdecay > 1 else hparams.lrdecay
         hparams.tauRatings = 0.001 if hparams.tauRatings < 0.001 else 10.0 if hparams.tauRatings > 10.0 else hparams.tauRatings
-        hparams.tauL2 = 0.001 if hparams.tauL2 < 0.001 else 10.0 if hparams.tauL2 > 10.0 else hparams.tauL2
+        hparams.tauL2 = 0.001 if hparams.tauL2 < 0.001 else 100.0 if hparams.tauL2 > 100.0 else hparams.tauL2
         hparams.depth = 1 if hparams.depth < 1 else 5 if hparams.depth > 5 else hparams.depth
         hparams.hiddenDims = 8 if hparams.hiddenDims < 8 else 256 if hparams.hiddenDims > 256 else hparams.hiddenDims
         hparams.queryDims = 8 if hparams.queryDims < 8 else 256 if hparams.queryDims > 256 else hparams.queryDims
@@ -229,7 +225,7 @@ if __name__ == "__main__":
     required_args.add_argument("listfile", help="CSV file listing games and labels")
     required_args.add_argument("featuredir", help="Directory containing extracted features")
     optional_args.add_argument("-f", "--featurename", help="Type of features to train on", type=str, default="pick", required=False)
-    optional_args.add_argument("-d", "--title", help="Subdirectory name for files produced by this search", type=str, default="search", required=False)
+    optional_args.add_argument("-T", "--title", help="Subdirectory name for files produced by this search", type=str, default="search", required=False)
     optional_args.add_argument("-n", "--netdir", help="Directory name for trained models", type=str, default="nets", required=False)
     optional_args.add_argument("-l", "--logdir", help="Directory name for log files", type=str, default="logs", required=False)
     optional_args.add_argument("-b", "--batch-size", help="Minibatch size", type=int, default=100, required=False)
@@ -238,8 +234,8 @@ if __name__ == "__main__":
     optional_args.add_argument("-w", "--workers", help="Nr of concurrent worker processes", type=int, default=1, required=False)
     optional_args.add_argument("-p", "--patience", help="Epochs without improvement before early stop", type=int, default=3, required=False)
     optional_args.add_argument("-s", "--samples", help="Nr of training runs per iteration", type=int, default=15, required=False)
-    optional_args.add_argument("-i", "--broad-iterations", help="Nr of broad hyperparameter search iterations", type=int, default=2, required=False)
-    optional_args.add_argument("-j", "--fine-iterations", help="Nr of fine hyperparameter search iterations", type=int, default=2, required=False)
+    optional_args.add_argument("-i", "--iterations", help="Nr of hyperparameter search iterations", type=int, default=2, required=False)
+    optional_args.add_argument("-d", "--decay", help="Decay of search scale", type=float, default=1, required=False)
 
     args = vars(parser.parse_args())
     main(args)

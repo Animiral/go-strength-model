@@ -3,10 +3,8 @@
 
 from __future__ import annotations
 import os
-from os.path import exists
 import csv
 import re
-from typing import List, Optional
 import zipfile
 import math
 import numpy as np
@@ -116,17 +114,26 @@ class MovesDataset(Dataset):
         else:
             featureDims = -1  # guess
 
-        basePath, _ = os.path.splitext(game.sgfPath)
-        featurePath = f"{self.featuredir}/{basePath}_{player}Recent.zip"
+        # get features from memory cache (optional)
+        key = (game.sgfPath, player, featureName)
+        if self.features is not None and key in self.features:
+            return self.features[key]
 
-        # no need to load features from disk if they are in (optional) memory cache
-        if self.features is not None and (featurePath, featureName) in self.features:
-            return self.features[(featurePath, featureName)]
+        # get features from uncompressed storage
+        basePath, _ = os.path.splitext(game.sgfPath)
+        path = f"{self.featuredir}/{basePath}_{player}Recent_{featureName}.npy"
+        if os.path.exists(path):
+            features = torch.from_numpy(np.load(path))
         else:
-            features = load_features_from_zip(featurePath, featureName, featureDims)
-            if self.features is not None:
-                self.features[(featurePath, featureName)] = features
-            return features
+            # get features from compressed storage
+            path = f"{self.featuredir}/{basePath}_{player}Recent.zip"
+            features = load_features_from_zip(path, featureName, featureDims)
+
+        # store features in memory cache (optional)
+        if self.features is not None:
+            self.features[key] = features
+
+        return features
 
     def preload(self):
         """
