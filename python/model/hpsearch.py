@@ -7,6 +7,7 @@ import sys
 import copy
 import datetime
 import math
+import re
 import random
 from dataclasses import dataclass
 from multiprocessing.pool import ThreadPool
@@ -44,6 +45,7 @@ def main(args):
     steps = args["steps"]
     epochs = args["epochs"]
     workers = args["workers"]
+    resume = args["resume"]
     patience = args["patience"]
     samples = args["samples"]
     iterations = args["iterations"]
@@ -60,7 +62,8 @@ def main(args):
         print(f"[{timestamp}] {message}")
         logfile.write(f"[{timestamp}] {message}\n")
 
-    search = HyperparamSearch(title, listfile, featuredir, featurename, netdir, logdir, workers, epochs, steps, batchSize, patience, samples)
+    search = HyperparamSearch(title, listfile, featuredir, featurename, netdir, logdir,
+                              workers, resume, epochs, steps, batchSize, patience, samples)
     scale = 1.0
     modelfile = None
 
@@ -81,7 +84,7 @@ class HyperparamSearch:
 
     def __init__(self, title: str, # trainData: MovesDataset, validationData: MovesDataset,
                  listfile: str, featuredir: str, featurename: str,
-                 netdir: str, logdir: str, workers: int,
+                 netdir: str, logdir: str, workers: int, resume: bool,
                  epochs: int, steps: int, batchSize: int,
                  patience: int, trainingSamples: int):
         self.title = title
@@ -96,6 +99,7 @@ class HyperparamSearch:
         self.netdir = netdir
         self.logdir = logdir
         self.workers = workers
+        self.resume = resume
         self.epochs = epochs
         self.steps = steps
         self.batchSize = batchSize
@@ -137,7 +141,7 @@ class HyperparamSearch:
         hparams.depth = random.randint(1, 5)
         hparams.hiddenDims = int(math.ceil(hparams.hiddenDims * (2**random.uniform(-2*scale, 2*scale))))
         hparams.queryDims = int(math.ceil(hparams.queryDims * (2**random.uniform(-2*scale, 2*scale))))
-        hparams.inducingPoints += random.randint(-32*scale, 32*scale)
+        hparams.inducingPoints += random.randint(round(-32*scale), round(32*scale))
         return self.clampParams(hparams)
 
     def clampParams(self, hparams: HyperParams):
@@ -151,6 +155,53 @@ class HyperparamSearch:
         hparams.inducingPoints = 1 if hparams.inducingPoints < 1 else 64 if hparams.inducingPoints > 64 else hparams.inducingPoints
         return hparams
 
+    def loadResults(self, logpath: str):
+        """
+        Read the hparams and validationloss from a search
+        training run that logged to the given file.
+        """
+        hpattern = re.compile(
+            r"HP Search it(?P<iteration>\d+) seq(?P<sequence>\d+) \| HyperParams\((?P<hyperparameters>[^\)]+)\)"
+        )
+        vlpattern = re.compile(r"validation\s+([0-9.]+)")
+
+        with open(logpath, "r") as logfile:
+            lines = logfile.readlines()
+
+        match = hpattern.search(lines[0])
+        if not match:
+            raise ValueError(f"Hyperparameters not found in log file {logpath}")
+
+        iteration = match.group("iteration")
+        sequence = match.group("sequence")
+        hpstr = match.group("hyperparameters")
+
+        # Parse the hyperparameters string into a dictionary
+        hplookup = {}
+        for param in hpstr.split(", "):
+            key, value = param.split("=")
+            hplookup[key] = float(value)
+
+        hparams = HyperParams(
+            learningrate=float(hplookup["learningrate"]),
+            lrdecay=float(hplookup["lrdecay"]),
+            tauRatings=float(hplookup["tauRatings"]),
+            tauL2=float(hplookup["tauL2"]),
+            depth=int(hplookup["depth"]),
+            hiddenDims=int(hplookup["hiddenDims"]),
+            queryDims=int(hplookup["queryDims"]),
+            inducingPoints=int(hplookup["inducingPoints"])
+        )
+
+        vlosses = []
+        for line in lines[1:]:
+            match = vlpattern.search(line)
+            if match:
+                vlosses.append(float(match.group(1)))
+        validationloss = min(vlosses)
+
+        return hparams, validationloss
+
     def training(self, sequence: int, hparams: HyperParams):
         # Run the training in a manual subprocess of "train.py".
         # This is implemented manually instead of using a ProcessPool due to spurious hanging with the latter.
@@ -160,11 +211,17 @@ class HyperparamSearch:
         trainlosspath = f"{self.logdir}/{self.title}/trainloss_{self.iteration}_{sequence}.txt"
         validationlosspath = f"{self.logdir}/{self.title}/validationloss_{self.iteration}_{sequence}.txt"
         modelpath = f"{self.netdir}/{self.title}/model_{self.iteration}_{sequence}_{{}}.pth"
+        bestmodelpath = modelpath.replace("{}", "")  # best validationloss model by subprocess
+
+        if self.resume and os.path.exists(bestmodelpath):
+            # skip this training run for existing result
+            hparams, validationloss = self.loadResults(logpath)
+            print(f"Validation loss it{self.iteration} seq{sequence}: {validationloss}")
+            return hparams, bestmodelpath, validationloss
 
         args = [
             "python3", scriptpath,
             self.listfile, self.featuredir, "-f", self.featurename,
-            "--lowmemory",  # we cannot have every worker load the huge dataset
             "--outfile", modelpath,
             "--trainlossfile", trainlosspath,
             "--validationlossfile", validationlosspath,
@@ -181,10 +238,12 @@ class HyperparamSearch:
             "--query-dims", str(hparams.queryDims),
             "--inducing-points", str(hparams.inducingPoints)]
 
+        if self.workers > 1:  # we cannot have every worker load the huge dataset
+            args.append("--lowmemory")
+
         # before starting training, clean previous results
-        modelpath = modelpath.replace("{}", "")  # best validationloss model by subprocess
         os.path.exists(validationlosspath) and os.remove(validationlosspath)
-        os.path.exists(modelpath) and os.remove(modelpath)
+        os.path.exists(bestmodelpath) and os.remove(bestmodelpath)
 
         # run training to the end
         with open(logpath, "w") as logfile:
@@ -194,13 +253,13 @@ class HyperparamSearch:
 
         # find min validationloss from file written by subprocess
         assert os.path.exists(validationlosspath), f"Loss file by training process not found: {validationlosspath}"
-        assert os.path.exists(modelpath), f"Model file by training process not found: {modelpath}"
+        assert os.path.exists(bestmodelpath), f"Model file by training process not found: {bestmodelpath}"
 
         with open(validationlosspath, "r") as file:
             validationloss = min(float(line.split(',')[0]) for line in file if line.strip())
 
         print(f"Validation loss it{self.iteration} seq{sequence}: {validationloss}")
-        return hparams, modelpath, validationloss
+        return hparams, bestmodelpath, validationloss
 
     def logMessage(self, logfile, message):
         print(message)
@@ -232,6 +291,7 @@ if __name__ == "__main__":
     optional_args.add_argument("-t", "--steps", help="Number of batches per epoch", type=int, default=100, required=False)
     optional_args.add_argument("-e", "--epochs", help="Nr of training epochs", type=int, default=5, required=False)
     optional_args.add_argument("-w", "--workers", help="Nr of concurrent worker processes", type=int, default=1, required=False)
+    optional_args.add_argument("-r", "--resume", help="Reuse results of past training runs", action="store_true", required=False)
     optional_args.add_argument("-p", "--patience", help="Epochs without improvement before early stop", type=int, default=3, required=False)
     optional_args.add_argument("-s", "--samples", help="Nr of training runs per iteration", type=int, default=15, required=False)
     optional_args.add_argument("-i", "--iterations", help="Nr of hyperparameter search iterations", type=int, default=2, required=False)

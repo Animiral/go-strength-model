@@ -55,7 +55,7 @@ def main(args):
     trainData = MovesDataset(listfile, featuredir, "T", featurename=featurename, featurememory=not lowmemory)
     validationData = MovesDataset(listfile, featuredir, "V", featurename=featurename, featurememory=not lowmemory)
     validationLoader = MovesDataLoader(validationData, batch_size=batchSize)
-    model = StrengthNet(trainData.featureDims, depth, hiddenDims, queryDims, inducingPoints)
+    model = StrengthNet(trainData.featureDims, depth, hiddenDims, queryDims, inducingPoints, introspection=animation)
     model = model.to(device)
 
     if animation:

@@ -11,22 +11,25 @@ import inspect
 class StrengthNet(nn.Module):
     """Full model based on Set Transformer"""
 
-    def __init__(self, featureDims: int, depth: int, hiddenDims: int, queryDims: int, inducingPoints: int):
+    def __init__(self, featureDims: int, depth: int, hiddenDims: int,
+                 queryDims: int, inducingPoints: int, introspection: bool = False):
         super(StrengthNet, self).__init__()
         self.featureDims = featureDims
         self.depth = depth
         self.hiddenDims = hiddenDims
         self.queryDims = queryDims
         self.inducingPoints = inducingPoints
+        self.introspection = introspection
 
         layers = []
         layers.append(nn.Linear(featureDims, hiddenDims, bias=False))
         for _ in range(depth):
-            layers.append(ISAB(hiddenDims, queryDims, inducingPoints))
-        self.enc = Sequential(*layers)
+            layers.append(ISAB(hiddenDims, queryDims, inducingPoints, introspection=introspection))
+        self.enc = Sequential(*layers, introspection=introspection)
         self.dec = Sequential(
-                Pool(hiddenDims, queryDims),
-                nn.Linear(hiddenDims, 1, bias=False))
+                Pool(hiddenDims, queryDims, introspection=introspection),
+                nn.Linear(hiddenDims, 1, bias=False),
+                introspection=introspection)
 
     def forward(self, x, xlens = None):
         return self.dec(self.enc(x, xlens), xlens).squeeze(-1)
@@ -95,9 +98,10 @@ class StrengthNet(nn.Module):
 
 class Sequential(nn.Module):
     """Like nn.Sequential, but passes xlens (collated minibatch structure) where necessary"""
-    def __init__(self, *layers):
+    def __init__(self, *layers, introspection: bool = False):
         super(Sequential, self).__init__()
         self.layers = nn.ModuleList(layers)
+        self.introspection = introspection
     
     def forward(self, x, xlens = None):
         hs = []
@@ -107,33 +111,38 @@ class Sequential(nn.Module):
                 x = layer(x, xlens)
             else:
                 x = layer(x)
-            hs.append(x)  # store outputs for introspection
+            if self.introspection:
+                hs.append(x)
         self.hs = hs
         return x
 
 class Attention(nn.Module):
     """Dot-product attention; no batching"""
-    def __init__(self, queryDims: int):
+    def __init__(self, queryDims: int, introspection: bool = False):
         super(Attention, self).__init__()
         self.z = torch.sqrt(torch.tensor(queryDims, dtype=torch.float32))
+        self.introspection = introspection
 
     def forward(self, q, k, v):
         a = torch.matmul(q, k.transpose(-2, -1)) / self.z
-        self.a = torch.softmax(a, dim=-1)  # store activations for introspection
-        h = torch.matmul(self.a, v)
+        a = torch.softmax(a, dim=-1)
+        if self.introspection:
+            self.a = a
+        h = torch.matmul(a, v)
         return h
 
 class AttentionBlock(nn.Module):
     """Dot-product attention + FC + norms"""
-    def __init__(self, hiddenDims: int, queryDims: int):
+    def __init__(self, hiddenDims: int, queryDims: int, introspection: bool = False):
         super(AttentionBlock, self).__init__()
         self.WQ = nn.Linear(hiddenDims, queryDims, bias=False)
         self.WK = nn.Linear(hiddenDims, queryDims, bias=False)
         self.WV = nn.Linear(hiddenDims, hiddenDims, bias=False)
-        self.at = Attention(queryDims)
+        self.at = Attention(queryDims, introspection=introspection)
         self.fc = nn.Linear(hiddenDims, hiddenDims, bias=True)
         self.norm0 = nn.LayerNorm(hiddenDims)
         self.norm1 = nn.LayerNorm(hiddenDims)
+        self.introspection = introspection
 
     def forward(self, q, qlens, h, hlens):
         qq = self.WQ(q)
@@ -155,19 +164,22 @@ class AttentionBlock(nn.Module):
         q = q.unsqueeze(0)  # add batch dimension of 1 for broadcast add
         h = self.norm0(q + h)
         h = h.flatten(0, 1)  # remove batch dimension
-        self.hres = self.fc(h)  # store preactivations for introspection
-        h = self.norm1(h + torch.relu(self.hres))
+
+        hres = self.fc(h)
+        if self.introspection:
+            self.hres = hres
+        h = self.norm1(h + torch.relu(hres))
 
         return h
 
 class ISAB(nn.Module):
     """Induced set attention block"""
-    def __init__(self, hiddenDims: int, queryDims: int, inducingPoints: int):
+    def __init__(self, hiddenDims: int, queryDims: int, inducingPoints: int, introspection: bool = False):
         super(ISAB, self).__init__()
         self.i = nn.Parameter(torch.Tensor(inducingPoints, hiddenDims))
         nn.init.uniform_(self.i)
-        self.ab0 = AttentionBlock(hiddenDims, queryDims)
-        self.ab1 = AttentionBlock(hiddenDims, queryDims)
+        self.ab0 = AttentionBlock(hiddenDims, queryDims, introspection=introspection)
+        self.ab1 = AttentionBlock(hiddenDims, queryDims, introspection=introspection)
 
     def forward(self, x, xlens = None):
         h = self.ab0(self.i, None, x, xlens)  # (batchSize * inducingPoints) x hiddenDims
@@ -177,11 +189,11 @@ class ISAB(nn.Module):
 
 class Pool(nn.Module):
     """Attention pooling layer with learned seed vector"""
-    def __init__(self, hiddenDims: int, queryDims: int):
+    def __init__(self, hiddenDims: int, queryDims: int, introspection: bool = False):
         super(Pool, self).__init__()
         self.s = nn.Parameter(torch.Tensor(1, hiddenDims))
         nn.init.uniform_(self.s)
-        self.ab = AttentionBlock(hiddenDims, queryDims)
+        self.ab = AttentionBlock(hiddenDims, queryDims, introspection=introspection)
 
     def forward(self, x, xlens = None):
         y = self.ab(self.s, None, x, xlens)
