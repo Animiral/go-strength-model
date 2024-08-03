@@ -64,8 +64,10 @@ It sources its data from the result as described in the main README. The input C
 The second parameter to the script just gives it a model name to use in the figure title.
 
 ```
-$ python3 plots/estimate_vs_label.py csv/games_glicko.csv Glicko-2
+$ python3 plots/estimate_vs_label.py --setmarker E csv/games_glicko.csv Glicko-2
 ```
+
+With the optional `--scoredist` switch, the script produces a different, 2-subfigure plot that shows the distribution of games where the outcome was predicted correctly or incorrectly by the model.
 
 # Neural Network Visualization
 
@@ -96,5 +98,7 @@ The hyperparameter search runs multiple trainings, looking for the best hyperpar
 The script `plots/search.py` shows the performance as a series of plots, one for every hyperparameter.
 
 ```
-$ python3 plots/search.py path/to/search/logs
+$ python3 plots/search.py --zoom path/to/search/logs
 ```
+
+The optional `--zoom` parameter restricts the y-axis to the range 0.578-0.59, showing only the more promising training runs. Especially in iteration 1, some results can be useless outliers that squish the better models at the bottom of the plot.

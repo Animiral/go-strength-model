@@ -89,23 +89,25 @@ For a dataset of 7M+ games, even with an optimized KataGo build with TensorRT ba
 
 ## Splitting the Dataset
 
-The script `random_split.py` reads a CSV file and adds or modifies the "Set" column, which marks a number of rows as a member in one of three sets: "T" for the *training set*, "V" for the *validation set* and "E" for the *test set*. Rows not in any set are marked with "-". The markers are distributed randomly, either as a proportion relative to the whole dataset if the user-defined "part" parameters are <1, or to an absolute number of rows given in the parameters if they are >=1.
+The script `random_split.py` reads a CSV file and adds or modifies the "Set" column, which marks a number of rows as a member in one of three sets: "T" for the *training set*, "V" for the *validation set*, "E" for the *test set* and "X" for the *exhibition set*. Rows not in any set are marked with "-". The markers are distributed randomly, either as a proportion relative to the whole dataset if the user-defined "part" parameters are <1, or to an absolute number of rows given in the parameters if they are >=1.
 
 The motivation behind assigning rows to sets instead of splitting the entire match pool is that if we just form distinct pools from the original one, we tear apart player's rating histories, depriving our algorithms of the data from which they derive their predictions. Instead, we keep them in the same pool. In the training process, we train only on training matches and test only on test matches, while the combined match data is available in the rating history. This technique stems from link prediction problems in social networks, where random test edges are removed from the full graph and later predicted by the model trained on the remaining edges.
 
 Run the set assignment script as follows.
 
 ```
-$ python3 python/random_split.py --input csv/games_judged.csv --output csv/games_judged.csv --trainingPart 10000 --validationPart 5000 --testPart 5000
+$ python3 python/random_split.py --input csv/games_judged.csv --output csv/games_judged.csv --trainingPart 10000 --validationPart 5000 --testPart 5000 --exhibitionPart 5000
 ```
 
-This will allocate 10000 rows to the training set, 5000 to the validation set and 5000 to the test set. Any remaining rows are left unassigned, but still part of the dataset, forming the players' histories and acting as a source of recent moves. Just the model will not be trained or tested on these data points. Because all games with a set marker (more specifically, their recent move sets) must be preprocessed through the KataGo network, it is not feasible to mark millions of games for training.
+This will allocate 10000 rows to the training set, 5000 to the validation set, 5000 to the test set and 5000 to the exhibition set. Any remaining rows are left unassigned, but still part of the dataset, forming the players' histories and acting as a source of recent moves. Just the model will not be trained or tested on these data points. Because all games with a set marker (more specifically, their recent move sets) must be preprocessed through the KataGo network, it is not feasible to mark millions of games for training.
 
 If not specified, the `--output` file defaults to the same as the `--input`, overwriting it with the added information.
 
 Rows that introduce a specific player for the first time in the dataset are generally not eligible for marking as any set, because these rows do not offer the necessary prior information for a model to predict the match outcome. The optional `--with-novice` switch disables this behavior, making all rows eligible for inclusion in one of the sets.
 
 The script can also check for noisy rows and not mark these as training rows. Noisy rows are rows where both players do not have a minimum number of future games in the dataset, meaning that their label does not have future information from the Glicko-2 system and might be less accurate. The number of required future games is specified with the optional `--advance` parameter, just like in the section "Labeling Games" below. A row is also noisy if the labels disagree with the score (outcome). I.e. black wins against higher-rated white or vice-versa. The noise criteria should only be applied to a labeled dataset (see below) and thus are only used if `--advance` is specified.
+
+A row qualifies to be in the exhibition set if neither the black nor the white player have more than 4 games of past history at the point of the match.
 
 With the optional `--modify` switch, the existing set assignment will be kept as far as possible, keeping changes to a minimum.
 

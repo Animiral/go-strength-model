@@ -6,6 +6,7 @@ The data is taken from all training*.txt files in the argument directory.
 """
 
 # import numpy as np
+import argparse
 import os
 import sys
 import re
@@ -68,7 +69,7 @@ def readVloss(vlossPath: str):
 
   return min(vlosses)
 
-def findRuns(directory):
+def findRuns(directory: str):
   runs = []
 
   for root, _, files in os.walk(directory):
@@ -86,10 +87,21 @@ def findRuns(directory):
   
   return pd.DataFrame(runs)
 
-def plot(df):
-  names = [c for c in df.columns if c not in ["vloss", "iteration"]]
+def plot(df, zoom: bool = False):
+  paramnames = [c for c in df.columns if c not in ["vloss", "iteration"]]
+  titles = {
+    "learningrate": "Learning Rate",
+    "lrdecay": "Learning Rate Decay",
+    "tauRatings": "Rating Loss Scaling Factor",
+    "tauL2": "Regularization Factor",
+    "depth": "Model Depth",
+    "hiddenDims": "Hidden Dimensions",
+    "queryDims": "Query Dimensions",
+    "inducingPoints": "Inducing Points",
+    "N": "Window Size"
+  }
 
-  fig, axs = plt.subplots(2, 4, figsize=(20, 10))
+  fig, axs = plt.subplots(4, 2, figsize=(8, 11)) # figsize=(20, 10))
   axs = axs.ravel()
 
   # colormap = plt.colormaps["tab10"]
@@ -97,15 +109,17 @@ def plot(df):
   colors = plt.cm.get_cmap("tab10", len(df)).colors
   shapes = {0: "o", 1: "s", 2: "D", 3: "v", 4: "X"}
 
-  for i, param in enumerate(names):
+  for i, param in enumerate(paramnames):
     ax = axs[i]
     for idx, row in df.iterrows():
       ax.scatter(row[param], row["vloss"], edgecolors=colors[idx], facecolors="none", marker=shapes[row["iteration"]])
 
-    ax.set_title(f"Validation Loss vs {param}")
-    ax.set_xlabel(param)
-    ax.set_ylabel("Min Validation Loss")
-    # ax.set_ylim(0.579, 0.59)  # optional: hide outliers
+    ax.set_title(f"{titles[param]}")
+    # ax.set_xlabel(param)
+    if 0 == (i % 2):
+      ax.set_ylabel("Min Validation Loss")
+    if zoom:
+      ax.set_ylim(0.578, 0.59)  # optional: hide outliers
 
     if param == "learningrate":
       ax.set_xscale("log")
@@ -114,16 +128,23 @@ def plot(df):
       ax.set_xticks([1, 2, 3, 4, 5])
 
   # Hide the last subplot if there are fewer plots needed
-  for i in range(len(names), len(axs)):
+  for i in range(len(paramnames), len(axs)):
     axs[i].axis("off")
 
   plt.tight_layout()
   plt.show()
 
 if __name__ == "__main__":
-  path = sys.argv[1]
-  print(f'Read data from {path}...')
-  df = findRuns(path)
-  # import ace_tools as tools; tools.display_dataframe_to_user(name="hparams", dataframe=df)
-  print('Preparing plots...')
-  plot(df)
+  description = """
+  Visualize the marginal distributions p(L|t) of the validation loss L seen in the search under every hyperparameter t.
+  The data is taken from all training*.txt files in the argument directory.
+  """
+  parser = argparse.ArgumentParser(description=description)
+  parser.add_argument("-z", "--zoom", action="store_true", help="Restrict the y-axis to good candidates.")
+  parser.add_argument("logdir", type=str, help="Path to the log directory of the hyperparameter search.")
+  args = parser.parse_args()
+  print(vars(args))
+
+  df = findRuns(args.logdir)
+  print("Preparing plots...")
+  plot(df, args.zoom)

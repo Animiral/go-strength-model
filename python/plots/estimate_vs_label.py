@@ -2,8 +2,9 @@
 # Usage: plots/estimate_vs_label.py csv/games_glicko.csv Glicko-2
 """
 Given an input CSV file describing predicted/actual ratings (and score),
-plot them vs the labels from the same file. One plot per set marker (T/V/E).
+plot them vs the labels from the same file. Optional set marker (default E)
 """
+import argparse
 import sys
 import csv
 import matplotlib.pyplot as plt
@@ -67,29 +68,46 @@ def plot_score(ax_white, ax_black, whitewins, blackwins):
   ax_black.scatter(range(len(blackwins)), blackwins, color=colors_black, label="Black Wins", alpha=0.1)
 
 if __name__ == "__main__":
-  path = sys.argv[1]
-  modelname = sys.argv[2] if len(sys.argv) > 2 else "Model"
+  description = """
+  Given an input CSV file describing predicted/actual ratings (and score),
+  plot them vs the labels from the same file. Optional set marker (default E)
+  """
+  parser = argparse.ArgumentParser(description=description)
+  parser.add_argument("-m", "--setmarker", type=str, default="E", help="Marker of the set to plot (T/V/E/X).")
+  parser.add_argument("-s", "--scoredist", action="store_true", help="Plot the score distribution.")
+  parser.add_argument("path", type=str, help="Path to the dataset list CSV file.")
+  parser.add_argument("title", type=str, default="Model", help="Name of the evaluated function for plot title.")
+  args = parser.parse_args()
+  print(vars(args))
 
-  fig, axs = plt.subplots(2, 2, figsize=(12.8, 9.6))
+  # fig, axs = plt.subplots(2, 2, figsize=(6, 6))  # all in one
+  # ax_r = axs[0, 0]
+  # ax_w = axs[1, 0]
+  # ax_b = axs[1, 1]
 
-  # TODO: fix the loops to go back to having all figures
-  print(f"Read data from {path}...")
-  ratings, scores = read_csv(path)
-  for setname, ratlist in ratings.items():
-    setname = {"T": "Training Set", "V": "Validation Set", "E": "Test Set"}[setname]
-    print(f"Preparing {setname} ratings...")
+  ratings, scores = read_csv(args.path)
+  setname = {"T": "Training Set", "V": "Validation Set", "E": "Test Set"}[args.setmarker]
 
-    setup_ratings(axs[0, 0], modelname, setname)
-    x, y = zip(*ratlist)
-    plot_ratings(axs[0, 0], x, y)
-
-  for setname, scolist in scores.items():
-    setname = {"T": "Training Set", "V": "Validation Set", "E": "Test Set"}[setname]
+  if args.scoredist:
+    fig, axs = plt.subplots(1, 2, figsize=(6, 4))  # two
+    ax_w = axs[0]
+    ax_b = axs[1]
+    scores = scores[args.setmarker]
     print(f"Preparing {setname} scores...")
 
-    whitewins = sorted([s[1] for s in scolist if s[0] < 0.5])
-    blackwins = sorted([s[1] for s in scolist if s[0] > 0.5])
-    plot_score(axs[1, 0], axs[1, 1], whitewins, blackwins)
+    setup_score(ax_w, ax_b)
+    whitewins = sorted([s[1] for s in scores if s[0] < 0.5])
+    blackwins = sorted([s[1] for s in scores if s[0] > 0.5])
+    plot_score(ax_w, ax_b, whitewins, blackwins)
+    plt.tight_layout()
+  else:
+    fig, axs = plt.subplots(figsize=(6, 4))  # just one
+    ax_r = axs
+    ratings = ratings[args.setmarker]
+    print(f"Preparing {setname} ratings...")
 
-  # plt.tight_layout()
+    setup_ratings(ax_r, args.title, setname)
+    x, y = zip(*ratings)
+    plot_ratings(ax_r, x, y)
+
   plt.show()

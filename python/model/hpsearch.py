@@ -70,10 +70,11 @@ def main(args):
     for i in range(iterations):
         logMessage(f"=== Hyperparameter Search: Iteration {i}, scale={scale} ===")
         hparams, modelfile, validationloss = search.search(scale)
-        logMessage(f"Best hparams (vloss={validationloss}) broad{i}: {hparams}")
+        logMessage(f"Best hparams (vloss={validationloss}) it{i}: {hparams}")
         scale *= decay
 
     if modelfile:
+        modelfile = os.path.abspath(modelfile)  # link to abs path is best practice
         bestfile = f"{netdir}/{title}/model.pth"
         os.symlink(modelfile, bestfile)
 

@@ -138,8 +138,8 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--novice-check", action="store_true", help='Print extra stats based on player\'s first occurrences')
     args = parser.parse_args()
 
-    if args.setmarker not in ['T', 'V', 'E', '*']:
-        raise ValueError("Set marker must be one of 'T', 'V', 'E', '*'.")
+    if args.setmarker not in ["T", "V", "E", "X", "*"]:
+        raise ValueError('Set marker must be one of "T", "V", "E", "X", "*".')
 
     main(args.list, args.setmarker, args.fixed_prediction, args.novice_check)
 

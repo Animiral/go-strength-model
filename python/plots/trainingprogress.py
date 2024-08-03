@@ -37,11 +37,12 @@ def plot(ax, trainlosses, testlosses):
     testlabels = range(len(testlosses))
 
     if len(trainlosses) > 1:
-        ax.fill_between(trainlabels, lt_s, color='blue', alpha=0.3, label="Training Score Loss")
-        ax.fill_between(trainlabels, [sum(x) for x in zip(lt_s, lt_r)], lt_s, color='blue', alpha=0.5, label="Training Ratings Loss")
-        ax.fill_between(trainlabels, lt, [sum(x) for x in zip(lt_s, lt_r)], color='blue', alpha=0.7, label="Training Regularization Loss")
+        ax.fill_between(trainlabels, lt_s, color='lightblue', label="Training Score Loss")
+        ax.fill_between(trainlabels, [sum(x) for x in zip(lt_s, lt_r)], lt_s, color='mediumblue', label="Training Ratings Loss")
+        ax.fill_between(trainlabels, lt, [sum(x) for x in zip(lt_s, lt_r)], color='darkblue', label="Training Regularization Loss")
     ax.plot(testlabels, lv_s, color='red', linewidth=2, label="Validation Score Loss")
     ax.plot(testlabels, lv_r, color='orange', linewidth=2, label="Validation Ratings Loss")
+    ax.set_ylim(0, 3.8)
     ax.legend()
 
 if __name__ == "__main__":
@@ -51,7 +52,7 @@ if __name__ == "__main__":
     trainlosses = read_losses(trainlossfile)
     testlosses = read_losses(testlossfile)
 
-    fig = plt.figure(figsize=(12.8, 9.6))
+    fig = plt.figure(figsize=(6, 5))
     ax = fig.add_subplot(111)
     setup(ax)
     plot(ax, trainlosses, testlosses)

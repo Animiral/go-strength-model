@@ -26,8 +26,10 @@ class Pool(Enum):
     TRAINING = 1    # assign to training set
     VALIDATION = 2  # assign to validation set
     TEST = 3        # assign to test set
-    ELIGIBLE = 4    # non-novice rows that we can use in validation and test
-    TRAINABLE = 5   # low-noise rows that we can use in training set
+    EXHIBITION = 4  # assign to exhibition set
+    ELIGIBLE = 5    # non-novice rows that we can use in validation and test
+    TRAINABLE = 6   # low-noise rows that we can use in training set
+    EXHIBITABLE = 7 # games between players with age 1 to 4 in the dataset
 
 @dataclass
 class PoolRow:
@@ -83,6 +85,34 @@ def markTrainables(prows: list[PoolRow], advance: Optional[int]):
 
         prow.pool = Pool.TRAINABLE
 
+def markExhibitables(prows: list[PoolRow], modify: bool):
+    """
+    Find rows which are suitable for exhibiting.
+    These are rows in which both players have no more than 4 past games in the pool.
+    """
+    players = dict()
+
+    for prow in prows:
+        # update counts
+        white, black = prow.row["Player White"], prow.row["Player Black"]
+        wcount, bcount = players.get(white, 0), players.get(black, 0)
+        wcount += 1
+        bcount += 1
+        players[white] = wcount
+        players[black] = bcount
+
+        # check for exhibitable
+        if Pool.ELIGIBLE != prow.pool:
+            continue  # non-eligible rows are not suitable for exhibition
+
+        if wcount > 5 or bcount > 5:
+            continue  # too much past history
+
+        if modify and prow.row["Set"] not in ["-", "X"]:
+            continue  # preserve other sets when modifying (this sometimes randomly costs us potential X games, but ok)
+
+        prow.pool = Pool.EXHIBITABLE
+
 def spreadRandom(prows: list[PoolRow], source: Pool, dest: Pool, count: int):
     """Randomly assign `count` rows from the `source` pool to the `dest` pool."""
     print(f"Randomly assign {count} rows from {source} to {dest}.")
@@ -98,7 +128,7 @@ def spreadRandom(prows: list[PoolRow], source: Pool, dest: Pool, count: int):
         if source == prow.pool:
             prow.pool = next(markers)
 
-def split(rows: list[dict], modify: bool, trainingPart: float, validationPart: float, testPart: Optional[float], advance: Optional[int], withNovice: bool):
+def split(rows: list[dict], modify: bool, trainingPart: float, validationPart: float, testPart: Optional[float], exhibitionPart: float, advance: Optional[int], withNovice: bool):
     if withNovice:  # all rows are eligible
         prows = [PoolRow(row=r, pool=Pool.ELIGIBLE) for r in rows]
     else:
@@ -121,8 +151,13 @@ def split(rows: list[dict], modify: bool, trainingPart: float, validationPart: f
         testGoal = int(round(eligibleCount * args.testPart))
     else:
         testGoal = int(args.testPart)
+    if args.exhibitionPart < 1:
+        exhibitionGoal = int(round(eligibleCount * args.exhibitionPart))
+    else:
+        exhibitionGoal = int(args.exhibitionPart)
 
-    print(f"Randomly splitting {eligibleCount} eligible of {len(rows)} rows: {trainGoal} training, {validationGoal} validation, {testGoal} testing.")
+    print(f"Randomly splitting {eligibleCount} eligible of {len(rows)} rows: {trainGoal} training, " +
+          f"{validationGoal} validation, {testGoal} testing, {exhibitionGoal} exhibition.")
 
     # distribute training games among trainable rows
     markTrainables(prows, advance)
@@ -138,9 +173,26 @@ def split(rows: list[dict], modify: bool, trainingPart: float, validationPart: f
     if trainCount < trainGoal:
         spreadRandom(prows, source=Pool.TRAINABLE, dest=Pool.TRAINING, count=trainGoal - trainCount)
 
+    # distribute exhibition games among exhibitable rows
+    if exhibitionGoal > 0:
+        for prow in prows:
+            if Pool.TRAINABLE == prow.pool:  # we don't care about trainable anymore; only about eligible
+                prow.pool = Pool.ELIGIBLE
+        markExhibitables(prows, modify)
+        print(f"Number of rows suitable for exhibition: {sum(Pool.EXHIBITABLE == prow.pool for prow in prows)}.")
+        # remember exhibition set assignments and go from there
+        for prow in prows:
+            if modify and Pool.EXHIBITABLE == prow.pool and "X" == prow.row["Set"]:
+                prow.pool = Pool.EXHIBITION
+        exhibitionCount = sum(Pool.EXHIBITION == prow.pool for prow in prows)
+        if exhibitionCount > exhibitionGoal:
+            spreadRandom(prows, source=Pool.EXHIBITION, dest=Pool.EXHIBITABLE, count=exhibitionCount - exhibitionGoal)
+        if exhibitionCount < exhibitionGoal:
+            spreadRandom(prows, source=Pool.EXHIBITABLE, dest=Pool.EXHIBITION, count=exhibitionGoal - exhibitionCount)
+
     # distribute validation&test games among eligible rows
     for prow in prows:
-        if Pool.TRAINABLE == prow.pool:  # we don't care about trainable anymore; only about eligible
+        if Pool.TRAINABLE == prow.pool or Pool.EXHIBITABLE == prow.pool:  # we don't care about those anymore; only about eligible
             prow.pool = Pool.ELIGIBLE
         if modify and Pool.ELIGIBLE == prow.pool and "V" == prow.row["Set"]:
             prow.pool = Pool.VALIDATION
@@ -163,9 +215,11 @@ def split(rows: list[dict], modify: bool, trainingPart: float, validationPart: f
         prow.row["Set"] = {
             Pool.UNASSIGN: "-",
             Pool.ELIGIBLE: "-",
+            Pool.EXHIBITABLE: "-",
             Pool.TRAINING: "T",
             Pool.VALIDATION: "V",
-            Pool.TEST: "E"
+            Pool.TEST: "E",
+            Pool.EXHIBITION: "X"
         }[prow.pool]
 
 if __name__ == "__main__":
@@ -217,6 +271,13 @@ if __name__ == "__main__":
         required=False
     )
     parser.add_argument(
+        "-x", "--exhibitionPart",
+        default=0.0,
+        type=float,
+        help="Part of total records which should be given the exhibition set marker",
+        required=False
+    )
+    parser.add_argument(
         "-n", "--with-novice",
         action="store_true",
         default=False,
@@ -246,14 +307,14 @@ if __name__ == "__main__":
             markerlookup = { r["File"] : r["Set"] for r in copyrows }
 
         assert not args.modify, "incompatible arguments: --copy and --modify"
-        print(f"Copying training/validation/test set markers from {args.copy}.")
+        print(f"Copying set markers from {args.copy}.")
 
         for r in rows:
             r["Set"] = markerlookup.get(r["File"], "-")  # tolerate copy from small dataset to larger dataset
         del markerlookup
     else:
         print(f"Assigning set markers for {len(rows)} rows from {args.input}.")
-        split(rows, args.modify, args.trainingPart, args.validationPart, args.testPart, args.advance, args.with_novice)
+        split(rows, args.modify, args.trainingPart, args.validationPart, args.testPart, args.exhibitionPart, args.advance, args.with_novice)
 
     # write output CSV file
     outpath = args.output
