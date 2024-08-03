@@ -1,0 +1,23 @@
+[2024-07-19 14:36:23] HP Search it1 seq1 | lr=1e-05 decay=0.9134831017283667 N=136 l=4 d=120 dq=60 m=24
+[2024-07-19 14:36:25] 	Epoch 0 error: training      inf, validation 0.798617
+[2024-07-19 14:36:30] 	Epoch 1 error: training 0.774160, validation 0.774478
+[2024-07-19 14:36:34] 	Epoch 2 error: training 0.733771, validation 0.759617
+[2024-07-19 14:36:39] 	Epoch 3 error: training 0.762762, validation 0.752480
+[2024-07-19 14:36:44] 	Epoch 4 error: training 0.719452, validation 0.747722
+[2024-07-19 14:36:48] 	Epoch 5 error: training 0.753072, validation 0.744066
+[2024-07-19 14:36:52] 	Epoch 6 error: training 0.712890, validation 0.741130
+[2024-07-19 14:36:57] 	Epoch 7 error: training 0.770259, validation 0.738254
+[2024-07-19 14:37:01] 	Epoch 8 error: training 0.643654, validation 0.735322
+[2024-07-19 14:37:06] 	Epoch 9 error: training 0.690642, validation 0.733496
+[2024-07-19 14:37:10] 	Epoch 10 error: training 0.720130, validation 0.732267
+[2024-07-19 14:37:15] 	Epoch 11 error: training 0.689770, validation 0.730897
+[2024-07-19 14:37:19] 	Epoch 12 error: training 0.796431, validation 0.730367
+[2024-07-19 14:37:24] 	Epoch 13 error: training 0.680501, validation 0.729816
+[2024-07-19 14:37:29] 	Epoch 14 error: training 0.747837, validation 0.730740
+[2024-07-19 14:37:33] 	Epoch 15 error: training 0.742690, validation 0.728598
+[2024-07-19 14:37:38] 	Epoch 16 error: training 0.665729, validation 0.726983
+[2024-07-19 14:37:42] 	Epoch 17 error: training 0.739418, validation 0.726640
+[2024-07-19 14:37:47] 	Epoch 18 error: training 0.698380, validation 0.721750
+[2024-07-19 14:37:51] 	Epoch 19 error: training 0.708379, validation 0.721985
+[2024-07-19 14:37:55] 	Epoch 20 error: training 0.732046, validation 0.724628
+[2024-07-19 14:38:00] 	Epoch 21 error: training 0.652883, validation 0.726804

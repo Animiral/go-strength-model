@@ -1,0 +1,10 @@
+[2024-07-19 14:22:57] HP Search it0 seq4 | lr=0.0007574480955642108 decay=0.9578483503077709 N=303 l=4 d=47 dq=20 m=22
+[2024-07-19 14:23:00] 	Epoch 0 error: training      inf, validation 0.821008
+[2024-07-19 14:23:06] 	Epoch 1 error: training 0.737915, validation 0.715719
+[2024-07-19 14:23:11] 	Epoch 2 error: training 0.591208, validation 0.724424
+[2024-07-19 14:23:16] 	Epoch 3 error: training 0.700163, validation 0.724784
+[2024-07-19 14:23:22] 	Epoch 4 error: training 0.713046, validation 0.709906
+[2024-07-19 14:23:27] 	Epoch 5 error: training 0.659310, validation 0.698199
+[2024-07-19 14:23:32] 	Epoch 6 error: training 0.596322, validation 0.705457
+[2024-07-19 14:23:38] 	Epoch 7 error: training 0.662143, validation 0.704793
+[2024-07-19 14:23:43] 	Epoch 8 error: training 0.635391, validation 0.712136

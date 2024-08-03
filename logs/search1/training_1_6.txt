@@ -1,0 +1,27 @@
+[2024-07-19 14:47:24] HP Search it1 seq6 | lr=8.692768613601045e-05 decay=0.9624483060797947 N=378 l=4 d=28 dq=67 m=44
+[2024-07-19 14:47:28] 	Epoch 0 error: training      inf, validation 0.834422
+[2024-07-19 14:47:33] 	Epoch 1 error: training 0.752680, validation 0.766921
+[2024-07-19 14:47:39] 	Epoch 2 error: training 0.736698, validation 0.737803
+[2024-07-19 14:47:44] 	Epoch 3 error: training 0.694833, validation 0.726599
+[2024-07-19 14:47:49] 	Epoch 4 error: training 0.729435, validation 0.719730
+[2024-07-19 14:47:55] 	Epoch 5 error: training 0.760004, validation 0.716428
+[2024-07-19 14:48:00] 	Epoch 6 error: training 0.697912, validation 0.712675
+[2024-07-19 14:48:06] 	Epoch 7 error: training 0.684134, validation 0.711317
+[2024-07-19 14:48:11] 	Epoch 8 error: training 0.692708, validation 0.707804
+[2024-07-19 14:48:16] 	Epoch 9 error: training 0.663220, validation 0.705521
+[2024-07-19 14:48:22] 	Epoch 10 error: training 0.746758, validation 0.703030
+[2024-07-19 14:48:27] 	Epoch 11 error: training 0.709694, validation 0.700389
+[2024-07-19 14:48:32] 	Epoch 12 error: training 0.683634, validation 0.697919
+[2024-07-19 14:48:37] 	Epoch 13 error: training 0.721803, validation 0.697147
+[2024-07-19 14:48:43] 	Epoch 14 error: training 0.670770, validation 0.699601
+[2024-07-19 14:48:48] 	Epoch 15 error: training 0.806273, validation 0.695134
+[2024-07-19 14:48:54] 	Epoch 16 error: training 0.656129, validation 0.693774
+[2024-07-19 14:48:59] 	Epoch 17 error: training 0.639525, validation 0.693091
+[2024-07-19 14:49:04] 	Epoch 18 error: training 0.608867, validation 0.694992
+[2024-07-19 14:49:10] 	Epoch 19 error: training 0.565876, validation 0.694529
+[2024-07-19 14:49:15] 	Epoch 20 error: training 0.714579, validation 0.689272
+[2024-07-19 14:49:20] 	Epoch 21 error: training 0.625996, validation 0.689648
+[2024-07-19 14:49:26] 	Epoch 22 error: training 0.706734, validation 0.688604
+[2024-07-19 14:49:31] 	Epoch 23 error: training 0.653820, validation 0.690139
+[2024-07-19 14:49:36] 	Epoch 24 error: training 0.697644, validation 0.690049
+[2024-07-19 14:49:42] 	Epoch 25 error: training 0.698947, validation 0.694061

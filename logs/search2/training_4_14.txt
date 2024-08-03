@@ -1,0 +1,47 @@
+[2024-08-01 23:07:07] HP Search it4 seq14 | HyperParams(learningrate=4.639318597074282e-05, lrdecay=1, tauRatings=1.5001599905381147, tauL2=71.55940800761007, depth=5, hiddenDims=246, queryDims=198, inducingPoints=61)
+listfile: csv/games_labels.csv
+featuredir: featurecache
+featurename: pick
+lowmemory: False
+animation: False
+outfile: nets/search/model_4_14_{}.pth
+trainlossfile: logs/search/trainloss_4_14.txt
+validationlossfile: logs/search/validationloss_4_14.txt
+figdir: None
+batch_size: 100
+steps: 100
+epochs: 100
+learningrate: 4.639318597074282e-05
+lrdecay: 1.0
+patience: 10
+tau_ratings: 1.5001599905381147
+tau_l2: 71.55940800761007
+depth: 5
+hidden_dims: 246
+query_dims: 198
+inducing_points: 61
+Device: cuda
+[2024-08-01 23:07:42] Epoch 0 error: training      inf(s) +      inf(r) +      inf(L2) =      inf, validation 0.691822(s), 3.078915(r)
+[2024-08-01 23:10:38] Epoch 1 error: training 0.418240(s) + 0.516247(r) + 0.932554(L2) = 1.867040, validation 0.596959(s), 0.698544(r)
+[2024-08-01 23:13:23] Epoch 2 error: training 0.431981(s) + 0.536843(r) + 0.930784(L2) = 1.899608, validation 0.594059(s), 0.614519(r)
+[2024-08-01 23:16:04] Epoch 3 error: training 0.488784(s) + 0.609421(r) + 0.928878(L2) = 2.027083, validation 0.591092(s), 0.600026(r)
+[2024-08-01 23:18:44] Epoch 4 error: training 0.409691(s) + 0.537486(r) + 0.926958(L2) = 1.874136, validation 0.589212(s), 0.591657(r)
+[2024-08-01 23:21:23] Epoch 5 error: training 0.440639(s) + 0.652098(r) + 0.925026(L2) = 2.017764, validation 0.587743(s), 0.587818(r)
+[2024-08-01 23:24:02] Epoch 6 error: training 0.420551(s) + 0.491214(r) + 0.923051(L2) = 1.834817, validation 0.587336(s), 0.559810(r)
+[2024-08-01 23:26:41] Epoch 7 error: training 0.438264(s) + 0.547507(r) + 0.921010(L2) = 1.906781, validation 0.586451(s), 0.587603(r)
+[2024-08-01 23:29:19] Epoch 8 error: training 0.366326(s) + 0.638142(r) + 0.918947(L2) = 1.923415, validation 0.586148(s), 0.555915(r)
+[2024-08-01 23:31:57] Epoch 9 error: training 0.431044(s) + 0.505938(r) + 0.916905(L2) = 1.853887, validation 0.585912(s), 0.582023(r)
+[2024-08-01 23:34:35] Epoch 10 error: training 0.417834(s) + 0.436354(r) + 0.914876(L2) = 1.769064, validation 0.583743(s), 0.546594(r)
+[2024-08-01 23:37:14] Epoch 11 error: training 0.483997(s) + 0.610800(r) + 0.912805(L2) = 2.007603, validation 0.586874(s), 0.539104(r)
+[2024-08-01 23:39:52] Epoch 12 error: training 0.442414(s) + 0.367438(r) + 0.910720(L2) = 1.720572, validation 0.583259(s), 0.547343(r)
+[2024-08-01 23:42:30] Epoch 13 error: training 0.433711(s) + 0.469694(r) + 0.908615(L2) = 1.812020, validation 0.584425(s), 0.554024(r)
+[2024-08-01 23:45:09] Epoch 14 error: training 0.439353(s) + 0.384574(r) + 0.906532(L2) = 1.730460, validation 0.592100(s), 0.530737(r)
+[2024-08-01 23:47:47] Epoch 15 error: training 0.417678(s) + 0.493946(r) + 0.904414(L2) = 1.816038, validation 0.585760(s), 0.551774(r)
+[2024-08-01 23:50:26] Epoch 16 error: training 0.451910(s) + 0.454049(r) + 0.902329(L2) = 1.808288, validation 0.586089(s), 0.505468(r)
+[2024-08-01 23:53:04] Epoch 17 error: training 0.353026(s) + 0.448149(r) + 0.900262(L2) = 1.701437, validation 0.593384(s), 0.567725(r)
+[2024-08-01 23:55:42] Epoch 18 error: training 0.429940(s) + 0.350171(r) + 0.898196(L2) = 1.678307, validation 0.589382(s), 0.530808(r)
+[2024-08-01 23:58:21] Epoch 19 error: training 0.436056(s) + 0.462012(r) + 0.896093(L2) = 1.794161, validation 0.585365(s), 0.484055(r)
+[2024-08-02 00:00:59] Epoch 20 error: training 0.393020(s) + 0.557448(r) + 0.893987(L2) = 1.844455, validation 0.592963(s), 0.506426(r)
+[2024-08-02 00:03:38] Epoch 21 error: training 0.412951(s) + 0.391471(r) + 0.891865(L2) = 1.696287, validation 0.589261(s), 0.476302(r)
+[2024-08-02 00:06:16] Epoch 22 error: training 0.386933(s) + 0.412035(r) + 0.889733(L2) = 1.688702, validation 0.584628(s), 0.512988(r)
+	[2024-08-02 00:06:16] Training done, best validation loss: 0.583259084224701

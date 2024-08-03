@@ -1,0 +1,10 @@
+[2024-08-01 18:06:02] === Hyperparameter Search: Iteration 0, scale=1.0 ===
+[2024-08-01 18:06:02] Best hparams (vloss=0.580462) it0: HyperParams(learningrate=3.0261625229672025e-05, lrdecay=1.0, tauRatings=5.824487476458363, tauL2=63.52659323457421, depth=4, hiddenDims=226, queryDims=64, inducingPoints=57)
+[2024-08-01 18:06:02] === Hyperparameter Search: Iteration 1, scale=0.6 ===
+[2024-08-01 18:06:02] Best hparams (vloss=0.579138) it1: HyperParams(learningrate=0.0002107847025168532, lrdecay=1.0, tauRatings=2.0680650618482317, tauL2=40.770873682841525, depth=2, hiddenDims=256, queryDims=135, inducingPoints=64)
+[2024-08-01 18:06:02] === Hyperparameter Search: Iteration 2, scale=0.36 ===
+[2024-08-01 18:06:02] Best hparams (vloss=0.579138) it2: HyperParams(learningrate=0.0002107847025168532, lrdecay=1.0, tauRatings=2.0680650618482317, tauL2=40.770873682841525, depth=2, hiddenDims=256, queryDims=135, inducingPoints=64)
+[2024-08-01 18:06:02] === Hyperparameter Search: Iteration 3, scale=0.216 ===
+[2024-08-01 18:06:02] Best hparams (vloss=0.579086) it3: HyperParams(learningrate=8.821532796030778e-05, lrdecay=1.0, tauRatings=1.7320296404184756, tauL2=58.620600946467775, depth=4, hiddenDims=256, queryDims=175, inducingPoints=59)
+[2024-08-01 18:06:02] === Hyperparameter Search: Iteration 4, scale=0.1296 ===
+[2024-08-02 00:06:17] Best hparams (vloss=0.5783631306886673) it4: HyperParams(learningrate=0.00021396642000883246, lrdecay=0.9948645856904452, tauRatings=2.0532163468869573, tauL2=73.88693639599305, depth=5, hiddenDims=254, queryDims=154, inducingPoints=61)
