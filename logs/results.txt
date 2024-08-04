@@ -78,3 +78,6 @@ Prediction accuracy: 3450/5000 (0.690), logp: -0.5783631423151187
 $ python3 python/calc_performance.py csv/games_search_e.csv -m E
 Finished counting run of 5000 matchups between 6250 players.
 Prediction accuracy: 3440/5000 (0.688), logp: -0.5767275619004602
+$ python3 python/calc_performance.py csv/games_search_x.csv -m X
+Finished counting run of 5000 matchups between 9522 players.
+Prediction accuracy: 3687/5000 (0.737), logp: -0.5498968734781258

@@ -8,6 +8,7 @@ import tempfile
 import torch
 from moves_dataset import load_features_from_zip, scale_rating
 from strengthnet import StrengthNet
+from rank import *
 
 device = "cuda"
 
@@ -45,8 +46,9 @@ def main(args):
 
     pred = evaluate(xs, model)
     pred = scale_rating(pred)
+    rank = to_rank(pred)
 
-    print(f"The estimated rating of {playername} is {pred}.")
+    print(f"The estimated rating of {playername} is {pred} ({rankstr(rank)}).")
 
 def newmodel(featureDims: int, args):
     depth = args.get("modeldepth", 2)
