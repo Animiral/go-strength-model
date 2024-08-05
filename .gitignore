@@ -5,6 +5,7 @@ player/
 featurecache/
 datasetviewer/
 games*.csv
+trickplay/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

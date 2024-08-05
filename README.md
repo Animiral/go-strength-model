@@ -403,6 +403,35 @@ The output file contains the games from the list that match the given set marker
 
 Visual presentations of the data found in the thesis are created using scripts in the `plots` subdirectory. Consult [the associated HowTo](plots/HOWTO.md) for reproduction steps.
 
+# Trickplay Evaluation
+
+The thesis contains an evaluation of trickplay variations from the book “Tricks in Joseki”. The raw input for this task is located in the `trickplay` subdirectory.
+To evaluate the positions given as SGF files requires the following steps:
+
+1. Acquire the KataGo source code and locate the python script `katago/python/genboard_run.py`.
+2. Acquire a trained network to complete board positions, like `genboard10.data` from [pull request #347 in the KataGo repository](https://github.com/lightvector/KataGo/pull/347).
+3. Precompute the initial positions of the problem SGFs into board strings for `genboard`. The script that does this is `python/trickboards.py` in this repository. Example usage: `python3 python/trickboards.py extract trickplay`.
+4. Feed all the boards into `genboard_run.py`. The completed board files must follow a naming convention for the next step. See below for command.
+5. Combine the generated boards with the original SGFs to get success and failure variation SGFs. Example usage: `python3 python/trickboards.py merge trickplay`.
+5. Extract move features for the black moves in the success and failure variations.
+6. Run the strength model on the move features for every problem.
+
+The commands to generate all the completed boards (step 4) follow this template:
+
+```
+GENBOARD=path/to/katago/python/genboard_run.py
+MODEL=path/to/genboard10.data
+BOARDFILES=./trickplay/board*.txt
+TURN=30
+SOURCE=0  # GoGoD source  (-1 is Fox, 0 is GoGod, and 1 is KGS)
+
+for FILE in $BOARDFILES ; do
+  OUTFILE=$($FILE/board/completed)
+  echo "Complete $FILE -> $OUTFILE"
+  $GENBOARD -model $MODEL -board "$(cat $FILE)" -turn $TURN -turnstdev 1 -source $SOURCE > "$OUTFILE"
+done
+```
+
 # Miscellaneous
 
 ## Filtering Games (alternative)
