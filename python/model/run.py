@@ -13,7 +13,7 @@ from rank import *
 device = "cuda"
 
 def main(args):
-    sgfs = args["sgf"]
+    inputs = args["inputs"]
     katapath = args["katago"]
     katamodel = args["katamodel"]
     kataconfig = args["kataconfig"]
@@ -21,9 +21,16 @@ def main(args):
     featurename = args["featurename"]
     playername = args["playername"]
 
-    print(f"Evaluating {len(sgfs)} game records:")
-    for sgf in sgfs:
-        print(f"  - {sgf}")
+    sgfs = [p for p in inputs if p.endswith(".sgf")]
+    zips = [p for p in inputs if not p in sgfs]
+    if sgfs:
+        print(f"Evaluating {len(sgfs)} game records:")
+        for path in sgfs:
+            print(f"  - {path}")
+    if zips:
+        print(f"Evaluating {len(zips)} feature archives:")
+        for path in zips:
+            print(f"  - {path}")
     print(f"KataGo binary: {katapath}")
     print(f"KataGo model: {katamodel}")
     print(f"KataGo configuration: {kataconfig if kataconfig else '(default)'}")
@@ -32,23 +39,32 @@ def main(args):
     print(f"Player name: {playername if playername else '(auto-detect)'}")
     print(f"Device: {device}")
 
-    with tempfile.NamedTemporaryFile(suffix='.zip') as outFile:
-        print(f"Feature file: {outFile.name}")
-        print(f"Executing katago...")
-        xs = katago(katapath, katamodel, kataconfig, sgfs, outFile.name, featurename, playername)
+    if sgfs:
+        with tempfile.NamedTemporaryFile(suffix='.zip') as outFile:
+            print(f"Feature file: {outFile.name}")
+            print(f"Executing katago...")
+            xs = katago(katapath, katamodel, kataconfig, sgfs, outFile.name, featurename, playername)
 
     print(f"Loading strength model...")
 
     model = StrengthNet.load(modelfile).to(device)
-    assert(model.featureDims == xs.shape[1])  # strength model must fit KataGo model
 
     print(f"Executing strength model...")
 
-    pred = evaluate(xs, model)
-    pred = scale_rating(pred)
-    rank = to_rank(pred)
+    if sgfs:
+        assert model.featureDims == xs.shape[1]  # strength model must fit KataGo model
+        pred = evaluate(xs, model)
+        pred = scale_rating(pred)
+        rank = to_rank(pred)
+        print(f"SGFs (player: {playername}): {pred} ({rankstr(rank)})")
 
-    print(f"The estimated rating of {playername} is {pred} ({rankstr(rank)}).")
+    for z in zips:
+        xs = load_features_from_zip(z, featurename)
+        assert model.featureDims == xs.shape[1]  # strength model must fit KataGo model
+        pred = evaluate(xs, model)
+        pred = scale_rating(pred)
+        rank = to_rank(pred)
+        print(f"{z}: {pred} ({rankstr(rank)})")
 
 def newmodel(featureDims: int, args):
     depth = args.get("modeldepth", 2)
@@ -59,7 +75,7 @@ def newmodel(featureDims: int, args):
 
 def katago(binPath: str, modelPath: str, configPath: str, sgfFiles: list[str], outFile: str, featureName: str, playerName: str) -> torch.Tensor:
     selection = f"-with-{featureName}"
-    playerNameArg = ["-playername", playerName] if playerName else []
+    playerNameArg = ["-playername", playerName] if playerName else ["-autodetect"]
     command = [binPath, "extract_sgfs"] + sgfFiles + ["-model", modelPath, "-config", configPath, "-outfile", outFile, selection] + playerNameArg
 
     with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as process:
@@ -83,26 +99,19 @@ def evaluate(xs: torch.Tensor, model: StrengthNet):
 
 if __name__ == "__main__":
     description = """
-    Apply the strength model on one or multiple SGF files.
+    Apply the strength model on one or multiple SGF or ZIP files.
+    SGFs will be combined towards one output strength estimate.
+    ZIPs will be judged each by itself.
     """
-
     parser = argparse.ArgumentParser(description=description,add_help=False)
-    required_args = parser.add_argument_group("required arguments")
-    optional_args = parser.add_argument_group("optional arguments")
-    optional_args.add_argument(
-        "-h",
-        "--help",
-        action="help",
-        default=argparse.SUPPRESS,
-        help="show this help message and exit"
-    )
-    required_args.add_argument("sgf", type=str, nargs="+", help="SGF file(s) to evaluate")
-    required_args.add_argument("--katamodel", help="KataGo neural network weights file")
-    required_args.add_argument("--model", help="Strength model neural network weights file")
-    optional_args.add_argument("-b", "--katago", help="Path to katago binary", type=str, default="katago", required=False)
-    optional_args.add_argument("-c", "--kataconfig", help="Path to katago configuration", type=str, required=False)
-    optional_args.add_argument("-f", "--featurename", help="Type of features to use", type=str, default="pick", required=False)
-    optional_args.add_argument("-p", "--playername", help="SGF player name to evaluate", type=str, required=False)
+    parser.add_argument("-h", "--help", action="help", default=argparse.SUPPRESS, help="show this help message and exit")
+    parser.add_argument("inputs", type=str, nargs="+", help="SGF or ZIP file(s) to evaluate")
+    parser.add_argument("--katamodel", help="KataGo neural network weights file", required=False)
+    parser.add_argument("--model", help="Strength model neural network weights file", required=False)
+    parser.add_argument("-b", "--katago", help="Path to katago binary", type=str, default="katago", required=False)
+    parser.add_argument("-c", "--kataconfig", help="Path to katago configuration", type=str, required=False)
+    parser.add_argument("-f", "--featurename", help="Type of features to use", type=str, default="pick", required=False)
+    parser.add_argument("-p", "--playername", help="SGF player name to evaluate", type=str, required=False)
 
     args = vars(parser.parse_args())
     main(args)

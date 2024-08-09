@@ -413,8 +413,8 @@ To evaluate the positions given as SGF files requires the following steps:
 3. Precompute the initial positions of the problem SGFs into board strings for `genboard`. The script that does this is `python/trickboards.py` in this repository. Example usage: `python3 python/trickboards.py extract trickplay`.
 4. Feed all the boards into `genboard_run.py`. The completed board files must follow a naming convention for the next step. See below for command.
 5. Combine the generated boards with the original SGFs to get success and failure variation SGFs. Example usage: `python3 python/trickboards.py merge trickplay`.
-5. Extract move features for the black moves in the success and failure variations.
-6. Run the strength model on the move features for every problem.
+5. Extract move features for the black moves in the success and failure variations. See below for command.
+6. Run the strength model on the move features for every problem. See below.
 
 The commands to generate all the completed boards (step 4) follow this template:
 
@@ -430,6 +430,31 @@ for FILE in $BOARDFILES ; do
   echo "Complete $FILE -> $OUTFILE"
   $GENBOARD -model $MODEL -board "$(cat $FILE)" -turn $TURN -turnstdev 1 -source $SOURCE > "$OUTFILE"
 done
+```
+
+The commands to extract the move features for black follow this template:
+
+```
+KATAGO=path/to/katago
+MODEL=path/to/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
+CONFIG=path/to/configs/analysis_example.cfg
+SGFS="trickplay/success*.sgf trickplay/failure*.sgf"
+
+for SGF in $SGFS ; do
+  OUTFILE="${SGF/.sgf/_BlackFeatures.zip}"
+  $KATAGO extract_sgfs $SGF -model $KATAMODEL -config $CONFIG -outfile $OUTFILE -color Black -window-size 500 -with-pick
+done
+```
+
+The commands to run the strength model on the extracted features follow this template:
+
+```
+ZIPS="trickplay/success*_BlackFeatures.zip trickplay/failure*_BlackFeatures.zip"
+MODELFILE=path/to/strengthmodel.pth
+FEATURENAME=pick
+
+export PYTHONPATH="python"
+python3 python/model/run.py $ZIPS --model $STRMODEL --featurename $FEATURENAME
 ```
 
 # Miscellaneous
