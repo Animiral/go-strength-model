@@ -12,6 +12,9 @@ from rank import *
 
 device = "cuda"
 
+class KatagoException(Exception):
+    pass
+
 def main(args):
     inputs = args["inputs"]
     katapath = args["katago"]
@@ -50,6 +53,7 @@ def main(args):
     model = StrengthNet.load(modelfile).to(device)
 
     print(f"Executing strength model...")
+    results = []
 
     if sgfs:
         assert model.featureDims == xs.shape[1]  # strength model must fit KataGo model
@@ -57,6 +61,7 @@ def main(args):
         pred = scale_rating(pred)
         rank = to_rank(pred)
         print(f"SGFs (player: {playername}): {pred} ({rankstr(rank)})")
+        results.append((None, pred, rankstr(rank)))
 
     for z in zips:
         xs = load_features_from_zip(z, featurename)
@@ -65,6 +70,9 @@ def main(args):
         pred = scale_rating(pred)
         rank = to_rank(pred)
         print(f"{z}: {pred} ({rankstr(rank)})")
+        results.append((z, pred, rankstr(rank)))
+
+    return results
 
 def newmodel(featureDims: int, args):
     depth = args.get("modeldepth", 2)
@@ -78,6 +86,9 @@ def katago(binPath: str, modelPath: str, configPath: str, sgfFiles: list[str], o
     playerNameArg = ["-playername", playerName] if playerName else ["-autodetect"]
     command = [binPath, "extract_sgfs"] + sgfFiles + ["-model", modelPath, "-config", configPath, "-outfile", outFile, selection] + playerNameArg
 
+    # temp debug
+    print("kata cmd: " + " ".join(command))
+
     with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as process:
         for line in process.stdout:
             print(line, end="", file=sys.stdout)
@@ -86,7 +97,7 @@ def katago(binPath: str, modelPath: str, configPath: str, sgfFiles: list[str], o
         
         process.wait()
         if process.returncode != 0:
-            raise RuntimeError(f"KataGo execution failed with return code {process.returncode}.")
+            raise KatagoException(f"KataGo execution failed with return code {process.returncode}.")
 
     return load_features_from_zip(outFile, featureName)
 

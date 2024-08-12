@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How deep is your Go?</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <h1>How deep is your Go?</h1>
+
+  <form action="/" method="post" enctype="multipart/form-data">
+    <div class="form-group">
+      <input type="file" name="sgfs" accept=".sgf" multiple required>
+    </div>
+    <div class="form-group">
+      <label for="player">Player name (optional):</label>
+      <input type="text" name="player" id="player" placeholder="must match player name in every SGF">
+    </div>
+    <button type="submit">Upload SGFs</button>
+  </form>
+
+  {% if error %}
+    <div class="error">{{ error }}</div>
+  {% endif %}
+
+  {% if rating is not none %}
+    <h2>{{ player if player else "Player" }} rating: {{ "%0.2f"|format(rating) }} ({{rank}})</h2>
+  {% endif %}
+
+</body>
+</html>
