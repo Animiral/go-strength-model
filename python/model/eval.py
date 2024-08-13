@@ -15,6 +15,10 @@ def main(args):
     featurename = args["featurename"]
     outfile = args["outfile"]  # output as CSV like listfile, but only evaluated games and with Predicted* columns
     setmarker = args["setmarker"]
+    if args["raw"]:
+        scale = lambda x: x
+    else:
+        scale = scale_rating
 
     print(f"Evaluate games from {listfile} marked '{setmarker}'")
     print(f"Load precomputed {featurename} features from {featuredir}")
@@ -25,18 +29,18 @@ def main(args):
     model = StrengthNet.load(modelfile).to(device)
 
     for i, game in enumerate(data.marked):
-        game.black.predictedRating, game.white.predictedRating, game.predictedScore = evaluate(data, i, model)
+        game.black.predictedRating, game.white.predictedRating, game.predictedScore = evaluate(data, i, model, scale)
 
     data.write(outfile)
 
-def evaluate(data: MovesDataset, i: int, model: StrengthNet):
+def evaluate(data: MovesDataset, i: int, model: StrengthNet, scale):
     model.eval()
     with torch.no_grad():
         bx, wx, _, _, _ = data[i]
         bx, wx = bx.to(device), wx.to(device)
         bpred, wpred = model(bx).item(), model(wx).item()
         spred = bradley_terry_score(bpred, wpred)
-        bpred, wpred = scale_rating(bpred), scale_rating(wpred)
+        bpred, wpred = scale(bpred), scale(wpred)
     return bpred, wpred, spred
 
 if __name__ == "__main__":
@@ -60,6 +64,7 @@ if __name__ == "__main__":
     optional_args.add_argument('-f', '--featurename', help='Type of features to train on', type=str, default='pick', required=False)
     optional_args.add_argument('-o', '--outfile', help='CSV file for output games and predictions', type=str, required=False)
     optional_args.add_argument('-m', '--setmarker', help='Marker for subset to evaluate', type=str, default='E', required=False)
+    optional_args.add_argument('-r', '--raw', help='Do not apply scaling to model output', action="store_true", required=False)
 
     args = vars(parser.parse_args())
     main(args)

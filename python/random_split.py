@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
 Usage: random_split.py [-h] [-i INPUT_PATH] [-c COPYFROM_PATH] [--modify] [-o OUTPUT_PATH] [-t TRAININGPART] [-v VALIDATIONPART]
-                       [-e TESTPART] [--with-novice] [-a ADVANCE]
+                       [-e TESTPART] [-x EXHIBITIONPART] [--with-novice] [-a ADVANCE]
 
 Given an input file listing Go matches, split them into a training set,
-a validation set and a test set.
+a validation set, a test set and, optionally, an exhibition set.
 The split amounts can be provided as arguments.
 Output the evaluation results to a new file or the same file with the assignment in the 'Set' column:
   - 'T' for training games
   - 'V' for validation games
   - 'E' for test games
+  - 'X' for exhibition games
 """
 
 import argparse

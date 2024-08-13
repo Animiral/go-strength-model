@@ -399,9 +399,31 @@ python3 python/model/eval.py "$LIST" "$FEATUREDIR" "$MODELFILE" --outfile "$OUTF
 
 The output file contains the games from the list that match the given set marker, extended by new columns for predicted ratings and score.
 
+Usually the rating predictions are scaled to match the Glicko-2 labels of the training set, but with the `--raw` option, the predictions are left exactly as they are coming from the network. This is required info to determine the scaling factors for the public web app, where we fit the model output to the scale observed on the OGS site.
+
 # Plots
 
 Visual presentations of the data found in the thesis are created using scripts in the `plots` subdirectory. Consult [the associated HowTo](plots/HOWTO.md) for reproduction steps.
+
+# Web Application "How Deep Is Your Go?"
+
+As part of this project, a small web application is provided for the public to use the strength model.
+This web app uses the `flask` library. Its implementation is found in the `python/webapp` subdirectory.
+
+To run, it requires the following environment variables:
+
+```
+KATAGO=path/to/katago  # binary
+KATAMODEL=path/to/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
+KATACONFIG=path/to/configs/analysis_example.cfg
+STRMODEL=path/to/strengthmodel.pth
+PYTHONPATH="go-strength-model/python:go-strength-model/python/model"
+```
+
+Where `go-strength-model` is the path to the directory of this repository.
+
+The application can run using flask's integrated development web server: `python3 python/webapp/webapp.py`, or using a separate web server.
+The `Dockerfile` in the root of this repository builds a complete image for the web app with all requirements, ready to be hosted.
 
 # Trickplay Evaluation
 
@@ -459,6 +481,32 @@ python3 python/model/run.py $ZIPS --model $STRMODEL --featurename $FEATURENAME
 
 # Miscellaneous
 
+## Rating Scale Fitting
+
+In order to match public expectations for the determination of ratings by the web app, we establish a distinct scaling factor for the full strength model that minimizes error towards ratings on OGS.
+
+To achieve this, we first run a `--raw` evaluation of the training set, as described in the section “Strength Model Calculation”. Refer to the following command:
+
+```
+python3 python/model/eval.py csv/games_labels.csv featurecache nets/search/model.pth --raw --featurename pick --outfile csv/games_raweval.csv --setmarker T
+```
+
+We only fit a sample of 100 games. This is plenty considering the noise inherent in rating estimation. The 100 games are selected at random.
+
+```
+head -n 1 csv/games_raweval.csv > csv/games_raw100.csv
+tail -n +2 csv/games_raweval.csv | shuf -n 100 >> csv/games_raw100.csv
+csvcut -c File,PredictedBlackRating,PredictedWhiteRating csv/games_raw100.csv > csv/games_raw100s.csv
+```
+
+This step requires `csvcut`, to be installed separately.
+
+The script `ogsratings.py` can use this file to automatically request the historical rating numbers from OGS.
+
+```
+python3 python/ogsratings.py csv/games_raw100s.csv csv/games_rawogs.csv
+```
+
 ## Filtering Games (alternative)
 
 The `sgffilter.py` script provided in this repository traverses a given directory and all its subdirectories for SGF files. Every file that contains a suitable training game is printed to the output file. Suitable games are no-handicap even 19x19 games with more than 5 seconds per move to think, have at least 20 moves played, were decided by either counting, resignation or timeout, and contain the string "ranked" (and not "unranked") in the GC property.
@@ -488,65 +536,6 @@ $ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker T
 $ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker V
 $ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker E
 ```
-
-## Estimate Playing Strength using the C++ Model (obsolete)
-
-Using the modified KataGo and a strength model file, we can let the program estimate a player's Glicko rating.
-The strength model file can be obtained, for example, by following the further steps in this README to train it on an existing game dataset.
-In addition to that model file, we only need to pass it a set of SGF files and a player name.
-
-```
-$ KATAGO=path/to/katago/cpp/katago
-$ CONFIG=path/to/katago/cpp/configs/analysis_example.cfg
-$ MODEL=path/to/katago/models/kata1-b18c384nbt-s6582191360-d3422816034.bin.gz
-$ STRENGTH_MODEL=$KATADIR/models/strength-model.bin
-$ PLAYER=playername
-$ SGF=sgf/game1.sgf sgf/game2.sgf sgf/game3.sgf
-$ $KATAGO strength_analysis -config $CONFIG -model $MODEL -strengthmodel $STRENGTH_MODEL -player $PLAYER $SGF
-```
-
-## Move Feature Precomputation for Proof of Concept Model (obsolete version)
-
-This smaller strength model uses just six features for each move computed from the outputs of the KataGo search engine. These are winrate after move, points lead after move, move policy, max policy on board, winrate loss and points loss. Here the KataGo network is static for us, so it saves time to do this expensive precomputation just once before training the strength model. Launch the command to precompute all features for every game in a list file and write them to feature files in a dedicated directory as follows:
-
-```
-$ KATA_MODEL=path/to/model.bin.gz
-$ FEATUREDIR=path/to/featurecache
-$ katago extract_pocfeatures -model $KATA_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
-```
-
-## Training the C++ Proof of Concept Model
-
-This implementation of the proof of concept strength model is obsolete. It can be trained using the modified KataGo version from my fork (see above). It implements the new `strength_training` command. Invoke it from the shell like this:
-
-```
-$ KATAGO=path/to/katago
-$ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
-$ CONFIG=configs/strength_analysis_example.cfg
-$ LISTFILE=csv/games_labels.csv
-$ FEATUREDIR=path/to/featurecache
-$ katago strength_training -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -featuredir $FEATUREDIR
-```
-
-Please keep in mind that relative SGF paths in `LISTFILE` must be relative to the current working directory.
-If the `LISTFILE` contains the "Set" column from the previous step, the matches will be used according to their designation. The program trains the model on training matches, reporting progress on the training and validation sets after every epoch.
-
-After training completes, the result is saved in the file given as `STRENGTH_MODEL`.
-
-## Calculation by the C++ Proof of Concept Model
-
-This implementation of the proof of concept strength model is obsolete. However, with such a trained model, we can apply it to a dataset by invoking modified KataGo with the `-strengthmodel` parameter:
-
-```
-$ STRENGTH_MODEL=path/to/strengthmodel.bin.gz
-$ CONFIG=configs/analysis_example.cfg
-$ LISTFILE=csv/games_judged.csv
-$ OUTFILE=csv/games_strmodel.csv
-$ FEATUREDIR=path/to/featurecache
-$ katago rating_system -strengthmodel $STRENGTH_MODEL -config $CONFIG -list $LISTFILE -outlist $OUTFILE -featuredir $FEATUREDIR -set V
-```
-
-The `-featuredir` is again mandatory and the output file is a valid rating calculation file.
 
 ## Stochastic Model Calculation Implemented in C++
 
