@@ -23,6 +23,7 @@ def main(args):
     modelfile = args["model"]
     featurename = args["featurename"]
     playername = args["playername"]
+    scale = args["scale"]
 
     sgfs = [p for p in inputs if p.endswith(".sgf")]
     zips = [p for p in inputs if not p in sgfs]
@@ -40,6 +41,7 @@ def main(args):
     print(f"Strength model: {modelfile}")
     print(f"Extract \"{featurename}\" features.")
     print(f"Player name: {playername if playername else '(auto-detect)'}")
+    print(f"Scale: {str(scale) if scale else '(default)'}")
     print(f"Device: {device}")
 
     if sgfs:
@@ -53,12 +55,17 @@ def main(args):
     model = StrengthNet.load(modelfile).to(device)
 
     print(f"Executing strength model...")
+    if scale:
+        scaling_func = lambda r: scale[0] * r + scale[1]
+    else:
+        scaling_func = scale_rating
+
     results = []
 
     if sgfs:
         assert model.featureDims == xs.shape[1]  # strength model must fit KataGo model
         pred = evaluate(xs, model)
-        pred = scale_rating(pred)
+        pred = scaling_func(pred)
         rank = to_rank(pred)
         print(f"SGFs (player: {playername}): {pred} ({rankstr(rank)})")
         results.append((None, pred, rankstr(rank)))
@@ -67,7 +74,7 @@ def main(args):
         xs = load_features_from_zip(z, featurename)
         assert model.featureDims == xs.shape[1]  # strength model must fit KataGo model
         pred = evaluate(xs, model)
-        pred = scale_rating(pred)
+        pred = scaling_func(pred)
         rank = to_rank(pred)
         print(f"{z}: {pred} ({rankstr(rank)})")
         results.append((z, pred, rankstr(rank)))
@@ -123,6 +130,7 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--kataconfig", help="Path to katago configuration", type=str, required=False)
     parser.add_argument("-f", "--featurename", help="Type of features to use", type=str, default="pick", required=False)
     parser.add_argument("-p", "--playername", help="SGF player name to evaluate", type=str, required=False)
+    parser.add_argument("-s", "--scale", help="2 coefficients for scaling the model output to Glicko-2", type=float, nargs=2, required=False)
 
     args = vars(parser.parse_args())
     main(args)

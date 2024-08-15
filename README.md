@@ -430,29 +430,16 @@ The `Dockerfile` in the root of this repository builds a complete image for the 
 The thesis contains an evaluation of trickplay variations from the book “Tricks in Joseki”. The raw input for this task is located in the `trickplay` subdirectory.
 To evaluate the positions given as SGF files requires the following steps:
 
-1. Acquire the KataGo source code and locate the python script `katago/python/genboard_run.py`.
-2. Acquire a trained network to complete board positions, like `genboard10.data` from [pull request #347 in the KataGo repository](https://github.com/lightvector/KataGo/pull/347).
-3. Precompute the initial positions of the problem SGFs into board strings for `genboard`. The script that does this is `python/trickboards.py` in this repository. Example usage: `python3 python/trickboards.py extract trickplay`.
-4. Feed all the boards into `genboard_run.py`. The completed board files must follow a naming convention for the next step. See below for command.
-5. Combine the generated boards with the original SGFs to get success and failure variation SGFs. Example usage: `python3 python/trickboards.py merge trickplay`.
-5. Extract move features for the black moves in the success and failure variations. See below for command.
-6. Run the strength model on the move features for every problem. See below.
-
-The commands to generate all the completed boards (step 4) follow this template:
-
-```
-GENBOARD=path/to/katago/python/genboard_run.py
-MODEL=path/to/genboard10.data
-BOARDFILES=./trickplay/board*.txt
-TURN=30
-SOURCE=0  # GoGoD source  (-1 is Fox, 0 is GoGod, and 1 is KGS)
-
-for FILE in $BOARDFILES ; do
-  OUTFILE=$($FILE/board/completed)
-  echo "Complete $FILE -> $OUTFILE"
-  $GENBOARD -model $MODEL -board "$(cat $FILE)" -turn $TURN -turnstdev 1 -source $SOURCE > "$OUTFILE"
-done
-```
+1. Since the strength model works on whole positions and not problem diagrams, we must find plausible board completions for them. In our case, we take these complete positions from the OGS dataset.
+  a. Precompute the initial positions of the problem SGFs into simple board string files. The script that does this is `python/trickboards.py` in this repository. Example usage: `python3 python/trickboards.py extract trickplay`.
+  b. Some patterns require manual adjustments.
+    - Problem 21 contains a captured stone. Since our pattern detection method does not work with captures, replace the captured location with the placeholder '?' in the board string file.
+    - Problems 24, 40, 43 and 47 do not occur in the dataset. To work around this, remove the last white move from the pattern and re-add it to the complete board.
+  c. Search the dataset for positions matching the board strings. The script `python/findpatterns.py` accomplishes this task. Example usage: `python3 python/findpatterns.py csv/games_labels.csv trickplay/board*.txt`.
+  d. The completed problem 61 requires another manual adjustment, with editor's judgement, because the successful refutation depends on a global ladder.
+2. Combine the generated boards with the original SGFs to get success and failure variation SGFs. Example usage: `python3 python/trickboards.py merge trickplay`. This script requires adherence to the naming convention `problem99.sgf` for problem patterns, and `completed99.txt` for the corresponding completed board string file from the previous step.
+3. Extract move features for the black moves in the success and failure variations. See below for command.
+4. Run the strength model on the move features for every problem. See below.
 
 The commands to extract the move features for black follow this template:
 
@@ -506,6 +493,14 @@ The script `ogsratings.py` can use this file to automatically request the histor
 ```
 python3 python/ogsratings.py csv/games_raw100s.csv csv/games_rawogs.csv
 ```
+
+From this, we use the script `ogsfit.py` to determine the scaling factors a and b, such that for model outputs x, the mean squared error between a * x + b and OGS ratings is minimal.
+
+```
+python3 python/ogsfit.py csv/games_rawogs.csv
+```
+
+Our result is `a = 334.0281191511932` and `b = 1595.094753057906`.
 
 ## Filtering Games (alternative)
 

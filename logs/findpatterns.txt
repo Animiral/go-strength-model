@@ -1,0 +1,85 @@
+$ python3 python/findpatterns.py csv/games_labels.csv trickplay/board*.txt
+Reading File column from csv/games_labels.csv
+trickplay/board2.txt in dataset/2005/12/29/13069-NPC-udhar_nabresh.sgf move 6
+trickplay/board63.txt in dataset/2006/01/27/13189-malweth-saruman.sgf move 8
+trickplay/board1.txt in dataset/2006/01/28/13204-ISebastian-jim_kiraly.sgf move 6
+trickplay/board58.txt in dataset/2006/03/05/13418-udhar_nabresh-pkr.sgf move 9
+trickplay/board54.txt in dataset/2006/04/19/13986-mixa-dobromila.sgf move 11
+trickplay/board48.txt in dataset/2006/04/30/14229-udhar_nabresh-GOCarata.sgf move 6
+trickplay/board6.txt in dataset/2006/05/31/14740-GOCarata-happy.sgf move 8
+trickplay/board75.txt in dataset/2006/06/01/14805-NPC-fingolfin.sgf move 7
+trickplay/board60.txt in dataset/2006/06/01/14844-GoCat-xxc.sgf move 15
+trickplay/board72.txt in dataset/2006/08/01/16138-kuikka-udhar_nabresh.sgf move 17
+trickplay/board49.txt in dataset/2006/09/10/17047-Foxiyama-maproom.sgf move 11
+trickplay/board66.txt in dataset/2006/10/14/18374-CurAvon-happy.sgf move 9
+trickplay/board25.txt in dataset/2006/10/20/18591-NPC-jnhmsbn.sgf move 7
+trickplay/board59.txt in dataset/2006/10/28/18900-saruman-NPC.sgf move 28
+trickplay/board62.txt in dataset/2006/11/18/19772-kuikka-GoCat.sgf move 8
+trickplay/board37.txt in dataset/2007/01/29/25252-gonut-Aurea_ECL.sgf move 9
+trickplay/board8.txt in dataset/2007/02/01/27477-Arathalion-Brushfire.sgf move 10
+trickplay/board69.txt in dataset/2007/04/01/34765-hotspur-luke.sgf move 15
+trickplay/board64.txt in dataset/2007/04/14/36996-ealdent-kashura.sgf move 30
+trickplay/board14.txt in dataset/2007/06/01/42104-GoCat-nare.sgf move 7
+trickplay/board34.txt in dataset/2007/06/01/42209-phoward-Vad.sgf move 8
+trickplay/board26.txt in dataset/2007/06/01/42309-eriktous-Iroh.sgf move 8
+trickplay/board78.txt in dataset/2007/07/06/47976-nare-Fuji.sgf move 6
+trickplay/board57.txt in dataset/2007/07/13/49078-ygperry-Apoah.sgf move 15
+trickplay/board17.txt in dataset/2007/08/01/52075-clevos-danono.sgf move 28
+trickplay/board71.txt in dataset/2007/09/11/60355-dhaas70-Azrael.sgf move 12
+trickplay/board15.txt in dataset/2007/10/29/67069-ichirou-Imagist.sgf move 7
+trickplay/board68.txt in dataset/2007/11/02/68353-Akimoon-phoward.sgf move 28
+trickplay/board67.txt in dataset/2007/11/12/69717-saruman-gonut.sgf move 16
+trickplay/board61.txt in dataset/2008/01/16/79368-sunnyarky-doubleR.sgf move 13
+trickplay/board74.txt in dataset/2008/02/18/84034-GnuGo-abbat.sgf move 10
+trickplay/board80.txt in dataset/2008/03/10/86998-KamiNoItte-fabu.sgf move 8
+trickplay/board3.txt in dataset/2008/04/01/89962-laver-maproom.sgf move 12
+trickplay/board5.txt in dataset/2008/04/01/89968-littleman-wegobad.sgf move 12
+trickplay/board7.txt in dataset/2008/04/01/90023-saruman-lucylawless.sgf move 9
+trickplay/board27.txt in dataset/2008/04/27/93343-illluck-KamiNoItte.sgf move 19
+trickplay/board13.txt in dataset/2008/06/10/99684-padic-craigL.sgf move 8
+trickplay/board38.txt in dataset/2008/06/30/103163-gonut-wossname.sgf move 7
+trickplay/board11.txt in dataset/2008/08/09/108612-gomoucha-oolong32.sgf move 12
+trickplay/board70.txt in dataset/2008/10/13/118223-MrCyclops-Ildefonse.sgf move 16
+trickplay/board73.txt in dataset/2008/11/18/122664-DemonRax-Go2master.sgf move 8
+trickplay/board16.txt in dataset/2008/12/17/126550-entropi-Imagist.sgf move 17
+trickplay/board65.txt in dataset/2009/01/31/132348-lgeml-Rill.sgf move 27
+trickplay/board79.txt in dataset/2009/03/31/142226-zakki-gonut.sgf move 6
+trickplay/board50.txt in dataset/2009/04/17/144607-Dyonn-icychip.sgf move 12
+trickplay/board39.txt in dataset/2009/08/25/163725-halle1-Rill.sgf move 18
+trickplay/board18.txt in dataset/2010/04/30/203682-grandmoche-MacNala.sgf move 21
+trickplay/board19.txt in dataset/2010/09/14/224987-zhal-Kohalander.sgf move 8
+trickplay/board35.txt in dataset/2011/01/21/243208-fschulenburg-Eike.sgf move 7
+trickplay/board77.txt in dataset/2011/04/01/254188-takka-shusaku77.sgf move 13
+trickplay/board4.txt in dataset/2011/05/17/263139-Etherion-IcedEarth.sgf move 13
+trickplay/board33.txt in dataset/2011/06/27/269873-DmAndr-rhubarb.sgf move 29
+trickplay/board20.txt in dataset/2011/07/11/272549-Maratoja-ekabiljo.sgf move 12
+trickplay/board53.txt in dataset/2011/09/05/283361-phoward-wuest.sgf move 20
+trickplay/board10.txt in dataset/2012/02/09/312277-deguoren-kuiper.sgf move 15
+trickplay/board36.txt in dataset/2012/03/05/316642-apoplexy-rtayek.sgf move 10
+trickplay/board55.txt in dataset/2012/03/28/319967-taeyang1-quiettimes.sgf move 60
+trickplay/board12.txt in dataset/2012/04/01/320561-Adonroid-galaas.sgf move 12
+trickplay/board22.txt in dataset/2012/10/01/351855-maproom-djllap.sgf move 8
+trickplay/board52.txt in dataset/2012/12/21/367780-phoward-gubbelface.sgf move 20
+trickplay/board76.txt in dataset/2013/06/06/397384-fabu-yanpin.sgf move 14
+trickplay/board41.txt in dataset/2014/05/02/587982-gogoweiqi-Hugarama.sgf move 17
+trickplay/board21.txt in dataset/2014/05/30/629251-nut-flexo37.sgf move 12
+trickplay/board32.txt in dataset/2014/05/30/629647-Animiral-lovego.sgf move 10
+trickplay/board9.txt in dataset/2014/07/02/691850-MrGorkajuice-koshaq90.sgf move 18
+trickplay/board23.txt in dataset/2014/11/22/1127341-p1501767425474802108-chupp.sgf move 8
+trickplay/board44.txt in dataset/2014/12/19/1251794-Dunsparce-p16886408968917675072.sgf move 18
+trickplay/board51.txt in dataset/2015/02/18/1565619-gofeclown-cbhnhi.sgf move 47
+trickplay/board56.txt in dataset/2015/04/08/1842020-karouzou-MagariSimoku.sgf move 19
+trickplay/board46.txt in dataset/2015/10/19/3072245-nzhu-OnionYang.sgf move 8
+trickplay/board42.txt in dataset/2016/03/12/4253621-poll80sei-lakewood.sgf move 10
+trickplay/board31.txt in dataset/2016/08/25/6169914-zee-Lomis.sgf move 13
+trickplay/board45.txt in dataset/2016/08/29/6210063-guest2016-shinre.sgf move 9
+trickplay/board30.txt in dataset/2017/03/11/8031183-Nan_Do-aletheia.sgf move 13
+trickplay/board28.txt in dataset/2017/04/16/8402308-donghabong-RoyalLeela.sgf move 12
+trickplay/board29.txt in dataset/2021/03/07/31763643-vigo2020-Spectral-1k.sgf move 15
+
+Not found: 24, 40, 43, 47.
+
+trickplay/board24a.txt in dataset/2007/07/18/50091-wossname-Prodigious.sgf move 15 sym  -> trickplay/completed24a.txt
+trickplay/board43a.txt in dataset/2011/10/23/291659-phoward-MatCauthon.sgf move 13 sym vd -> trickplay/completed43a.txt
+trickplay/board40a.txt in dataset/2012/07/31/340593-apoplexy-strathisla.sgf move 14 sym i -> trickplay/completed40a.txt
+trickplay/board47a.txt in dataset/2014/11/17/1106435-RaikB-backfire.sgf move 44 sym h -> trickplay/completed47a.txt

@@ -101,7 +101,7 @@ def main(args):
     for path in os.listdir(args.sgfdir):
         if path.startswith("problem") and path.endswith(".sgf"):
             digitIdx = next((i for i, char in enumerate(path) if char.isdigit()), 0)
-            fileSeq = path[digitIdx:].split('.')[0]
+            fileSeq = path[digitIdx:].split(".")[0]
             boardpath = f"board{fileSeq}.txt"
             completedpath = f"completed{fileSeq}.txt"
             successpath = f"success{fileSeq}.sgf"
