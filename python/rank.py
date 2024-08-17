@@ -20,3 +20,12 @@ def rankstr(rank):
   else:
     dan = min(rank - 29, 9);
     return f'{dan:.1f}-dan'
+
+def rankintstr(rank):
+  # 654==25.0k, 30==1.0d
+  if rank < 29.5:
+    kyu = min(30 - rank, 30);
+    return f'{kyu:.0f}-kyu'
+  else:
+    dan = min(rank - 28.999, 9);
+    return f'{dan:.0f}-dan'

@@ -28,7 +28,8 @@ def process(sgfdir, player):
     "kataconfig": app.config["KATACONFIG"],
     "model": app.config["STRMODEL"],
     "featurename": "pick",
-    "playername": player
+    "playername": player,
+    "scale": [334.0281191511932, 1595.094753057906]
   }
   _, rating, rank = model.run.main(args)[0]
   return rating, rank

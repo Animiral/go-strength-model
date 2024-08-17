@@ -102,3 +102,13 @@ $ python3 plots/search.py --zoom path/to/search/logs
 ```
 
 The optional `--zoom` parameter restricts the y-axis to the range 0.578-0.59, showing only the more promising training runs. Especially in iteration 1, some results can be useless outliers that squish the better models at the bottom of the plot.
+
+# Trick Play Ratings
+
+For visualizing the ratings determined by the strength model of the various trick play failure lines and refutations, the script `trickratings.py` creates a plot of their distribution.
+
+```
+$ python3 plots/trickratings.py csv/trickratings.csv
+```
+
+The input file `trickratings.csv` must be either used as it is in this repository, or manually constructed from the output of `run.py` over extracted trick line features. The process for this is described in the main `README`.
