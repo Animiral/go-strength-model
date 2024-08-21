@@ -29,7 +29,7 @@ def statRecentMoves(dataset: MovesDataset, player:str, game: GameEntry):
     return count, haveHead, havePick, haveTrunk
 
 def main(listpath: str, featuredir: str, require_head: bool = False, require_pick: bool = False, require_trunk: bool = False):
-    dataset = MovesDataset(listpath, featuredir, "*", sparse=False)
+    dataset = MovesDataset(listpath, featuredir, "*", sparse=False, featurememory=False)
     print(f"Loaded dataset {listpath} with {len(dataset.games)} games.")
 
     tcount = 0

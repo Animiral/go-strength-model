@@ -148,9 +148,9 @@ class MovesDataset(Dataset):
     def _findFeatureDims(self):
         """Discover feature dimensions by loading recent move data, assuming they are consistent."""
         self.featureDims = -1  # this causes reshape() in loadRecentMoves to guess
-        for game in self.marked:
+        for game in self.games:
             try:
-                data = self.loadRecentMoves('Black', game)
+                data = self.loadRecentMoves("Black", game)
             except FileNotFoundError:
                 continue
             if len(data) > 0:
