@@ -41,7 +41,7 @@ python3 plots/wrloss_rating.py csv/loss_rating.csv
 # Game Length Distribution
 
 This plot shows the distribution of game lengths for all games that ended in counting.
-The game length data must be provided in a plain text file, one per line. The script `analyzedataset.py` with the `gamelength` command writes out the data from a dataset list CSV. (The dummy argument is ignored, but required)
+The game length data must be provided in a plain text file, one per line. The script `analyzedataset.py` with the `gamelength` command writes out the data from a dataset list CSV. (The dummy argument is ignored, but required.) The script can be easily modified to consider the entire dataset, or just training games.
 Extract the data, then create the plot with `gamelength.py` as follows:
 
 ```
