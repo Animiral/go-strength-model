@@ -27,6 +27,7 @@ def plot(ax, trainlosses, testlosses):
         lt_s = [row[0] for row in trainlosses]
         lt_r = [row[1] for row in trainlosses if len(row) > 1]
         lt_l2 = [row[2] for row in trainlosses if len(row) > 2]
+        lt_mid = [sum(x) for x in zip(lt_s, lt_r)]
         lt = [sum(l) for l in zip(lt_s, lt_r, lt_l2)]
 
     lv_s = [row[0] for row in testlosses]
@@ -38,8 +39,8 @@ def plot(ax, trainlosses, testlosses):
 
     if len(trainlosses) > 1:
         ax.fill_between(trainlabels, lt_s, color='lightblue', label="Training Score Loss")
-        ax.fill_between(trainlabels, [sum(x) for x in zip(lt_s, lt_r)], lt_s, color='mediumblue', label="Training Ratings Loss")
-        ax.fill_between(trainlabels, lt, [sum(x) for x in zip(lt_s, lt_r)], color='darkblue', label="Training Regularization Loss")
+        ax.fill_between(trainlabels, lt_mid, lt_s, color='mediumblue', label="Training Ratings Loss")
+        ax.fill_between(trainlabels, lt, lt_mid, color='darkblue', label="Training Regularization Loss")
     ax.plot(testlabels, lv_s, color='red', linewidth=2, label="Validation Score Loss")
     ax.plot(testlabels, lv_r, color='orange', linewidth=2, label="Validation Ratings Loss")
     ax.set_ylim(0, 3.8)
@@ -48,11 +49,11 @@ def plot(ax, trainlosses, testlosses):
 if __name__ == "__main__":
     trainlossfile = sys.argv[1]
     testlossfile = sys.argv[2]
-    print(f"Read train loss from {testlossfile}, validation loss from {testlossfile}.")
+    print(f"Read train loss from {trainlossfile}, validation loss from {testlossfile}.")
     trainlosses = read_losses(trainlossfile)
     testlosses = read_losses(testlossfile)
 
-    fig = plt.figure(figsize=(6, 5))
+    fig = plt.figure(figsize=(6.4, 4.8))
     ax = fig.add_subplot(111)
     setup(ax)
     plot(ax, trainlosses, testlosses)

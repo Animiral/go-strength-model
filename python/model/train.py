@@ -70,8 +70,8 @@ def main(args):
         grad_alines, grad_hlines = netvis.setup_gradients(axs[1, 3], axs[1, 4], model)
         figlines = (emb_lines, act_alines, act_hlines, grad_alines, grad_hlines)
 
-    def callback(model, epoch, trainlosses, validationlosses, record_v):
-        log_progress(validationlossfile, trainlossfile, epoch, trainlosses, validationlosses)
+    def callback(model, epoch, trainlosses, validationlosses, epochtrainlosses, epochvalidationlosses, record_v):
+        log_progress(validationlossfile, trainlossfile, epoch, epochtrainlosses, epochvalidationlosses)
         save_model(model, outfile, epoch)
         if animation:
             display(fig, axs, figlines, model, epoch, trainlosses, validationlosses, record_v, figdir)
@@ -185,13 +185,15 @@ class Training:
         l_vs, l_vr, record_v = self.validate()
         validationlosses.append((l_vs, l_vr))
         # validationlosses.append((1, 1)) # skip initial validation for faster debugging
-        callback(model, 0, trainlosses, validationlosses, record_v)
+        callback(model, 0, [], validationlosses, [], validationlosses, record_v)
 
         for e in range(self.tparams.epochs):
-            trainlosses += self.epoch()
+            epochtrainlosses = self.epoch()
             l_vs, l_vr, record_v = self.validate()
-            validationlosses.append((l_vs, l_vr))
-            callback(model, e+1, trainlosses, validationlosses, record_v)
+            epochvalidationlosses = [(l_vs, l_vr)]
+            callback(model, e+1, trainlosses, validationlosses, epochtrainlosses, epochvalidationlosses, record_v)
+            trainlosses += epochtrainlosses
+            validationlosses += epochvalidationlosses
 
             # stop early?
             if l_vs < bestloss:  # performance = score loss. we only have ratings loss for reference.
@@ -297,7 +299,8 @@ def log_progress(validationlossfile, trainlossfile, epoch, trainlosses, validati
     print(f"[{timestamp}] Epoch {epoch} error: training {lt_score:>8f}(s) + {lt_ratings:>8f}(r) + {lt_l2:>8f}(L2) = {lt:>8f}, validation {lv_score:>8f}(s), {lv_ratings:>8f}(r)")
 
     if validationlossfile:
-        validationlossfile.write(f"{lv_score},{lv_ratings}\n")
+        for (lv_score, lv_ratings) in validationlosses:
+            validationlossfile.write(f"{lv_score},{lv_ratings}\n")
     if trainlossfile and trainlosses:
         for (lt_score, lt_ratings, lt_l2) in trainlosses:
             trainlossfile.write(f"{lt_score},{lt_ratings},{lt_l2}\n")
