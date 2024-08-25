@@ -403,7 +403,7 @@ Usually the rating predictions are scaled to match the Glicko-2 labels of the tr
 
 # Plots
 
-Visual presentations of the data found in the thesis are created using scripts in the `plots` subdirectory. Consult [the associated HowTo](plots/HOWTO.md) for reproduction steps.
+Visual presentations of the data found in the thesis are created using scripts in the `plots` subdirectory. Consult [the associated HowTo](python/plots/HOWTO.md) for reproduction steps.
 
 # Web Application "How Deep Is Your Go?"
 

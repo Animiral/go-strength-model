@@ -60,15 +60,18 @@ Prediction accuracy: 3220/5000 (0.644), logp: -2.029697883645208
 
 Evaluation of Proof of Concept Model:
 
-$ python3 python/calc_performance.py csv7M/games_pocmodel_t.csv -m T
-Finished counting run of 10000 matchups between 10642 players.
-Prediction accuracy: 4843/10000 (0.484), logp: -1.298705941928928
-$ python3 python/calc_performance.py csv7M/games_pocmodel_v.csv -m V
+$ python3 python/calc_performance.py csv/games_pocmodel_t.csv -m T
+Finished counting run of 10000 matchups between 9656 players.
+Prediction accuracy: 7607/10000 (0.761), logp: -0.5045863546946499
+$ python3 python/calc_performance.py csv/games_pocmodel_v.csv -m V
 Finished counting run of 5000 matchups between 6288 players.
-Prediction accuracy: 2452/5000 (0.490), logp: -1.2715469021675325
-$ python3 python/calc_performance.py csv7M/games_pocmodel_e.csv -m E
-Finished counting run of 5000 matchups between 6249 players.
-Prediction accuracy: 2486/5000 (0.497), logp: -1.2524562164012725
+Prediction accuracy: 3260/5000 (0.652), logp: -0.627719317692944
+$ python3 python/calc_performance.py csv/games_pocmodel_e.csv -m E
+Finished counting run of 5000 matchups between 6250 players.
+Prediction accuracy: 3259/5000 (0.652), logp: -0.6148196394984073
+$ python3 python/calc_performance.py csv/games_pocmodel_x.csv -m X
+Finished counting run of 5000 matchups between 9522 players.
+Prediction accuracy: 3543/5000 (0.709), logp: -0.5742642032418823
 
 Evaluation of Full Model:
 
