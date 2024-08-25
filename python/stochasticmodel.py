@@ -9,7 +9,7 @@ def predict(blackPloss, whitePloss):
     if 0 == len(blackPloss) or 0 == len(whitePloss):
         return .5  # no data for prediction
 
-    gamelength = 100  # assume 100 moves per player for an average game
+    gamelength = 127  # assume 127 moves per player for an average game (determined from training set)
     bMean = np.mean(blackPloss)
     bVar = np.var(blackPloss, ddof=1)
     wMean = np.mean(whitePloss)
