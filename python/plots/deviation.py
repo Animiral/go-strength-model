@@ -94,6 +94,7 @@ def plot_deviation(rds, meandev):
   overall_color = '#707070'  # grey
 
   x, y = zip(*((age, deviation) for age, data in rds.items() for (_, deviation) in data))
+  plt.figure(figsize=fontconfig.ideal_figsize)
 
   # points
   plt.scatter(x, y, alpha=0.1)
@@ -113,6 +114,7 @@ def plot_ratings(hist):
   global max_age_ranks
 
   # max_count = max(max(rankhist.values()) for rankhist in hist.values())
+  plt.figure(figsize=fontconfig.ideal_figsize)
 
   for age in hist:
     if age > max_age_ranks:

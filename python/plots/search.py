@@ -101,7 +101,7 @@ def plot(df, zoom: bool = False):
     "N": "Window Size"
   }
 
-  fig, axs = plt.subplots(4, 2, figsize=(8, 11)) # figsize=(20, 10))
+  fig, axs = plt.subplots(4, 2, figsize=fontconfig.big_figsize) # figsize=(20, 10))
   axs = axs.ravel()
 
   # colormap = plt.colormaps["tab10"]
@@ -114,9 +114,9 @@ def plot(df, zoom: bool = False):
     for idx, row in df.iterrows():
       ax.scatter(row[param], row["vloss"], edgecolors=colors[idx], facecolors="none", marker=shapes[row["iteration"]])
 
-    ax.set_title(f"{titles[param]}")
-    # ax.set_xlabel(param)
-    if 0 == (i % 2):
+    # ax.set_title(f"{titles[param]}")
+    ax.set_xlabel(f"{titles[param]}")
+    if True: # 0 == (i % 2):  # ylabels only on left hand side
       ax.set_ylabel("Min Validation Loss")
     if zoom:
       ax.set_ylim(0.578, 0.59)  # optional: hide outliers

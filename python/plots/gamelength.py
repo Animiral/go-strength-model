@@ -24,7 +24,7 @@ def density(els):
   return x, y
 
 def plot(x, y, mean_x):
-  plt.figure(figsize=[6.4, 4.8])
+  plt.figure(figsize=fontconfig.ideal_figsize)
   plt.plot(x, y)
   # mean indicator
   plt.axvline(mean_x, linestyle="--", linewidth=1, zorder=3)

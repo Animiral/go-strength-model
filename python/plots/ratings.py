@@ -28,7 +28,7 @@ def plot(x, y):
   high_color = '#AEC6CF'  # blue
   overall_color = '#707070'  # grey
 
-  plt.figure(figsize=[6.4, 4.8])
+  plt.figure(figsize=fontconfig.ideal_figsize)
   plt.plot(x, y, color=overall_color, linewidth=2, linestyle='--')
   plt.xlabel('Rating')
   plt.ylabel('Density')

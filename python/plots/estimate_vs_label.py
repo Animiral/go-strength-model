@@ -50,7 +50,10 @@ def plot_ratings(ax, x, y):
   ax.scatter(x, y, alpha=0.1)
   ax.plot([minx, maxx], [minx, maxx], linestyle="--", color="tab:cyan")
 
-def setup_score(ax_white, ax_black):
+def setup_score(ax_white, ax_black, fig=None, modelname="Model", setname="Set"):
+  if fig is not None:
+    fig.suptitle(f"{modelname} vs Outcomes in {setname}")
+
   ax_white.set_facecolor("beige")
   ax_white.set_xticks([])
   ax_white.set_ylabel("Est.Score")
@@ -86,22 +89,22 @@ if __name__ == "__main__":
   # ax_b = axs[1, 1]
 
   ratings, scores = read_csv(args.path)
-  setname = {"T": "Training Set", "V": "Validation Set", "E": "Test Set"}[args.setmarker]
+  setname = {"T": "Training Set", "V": "Validation Set", "E": "Test Set", "X": "Exhibition Set"}[args.setmarker]
 
   if args.scoredist:
-    fig, axs = plt.subplots(1, 2, figsize=(6, 4))  # two
+    fig, axs = plt.subplots(1, 2, figsize=fontconfig.ideal_figsize)  # two
     ax_w = axs[0]
     ax_b = axs[1]
     scores = scores[args.setmarker]
     print(f"Preparing {setname} scores...")
 
-    setup_score(ax_w, ax_b)
+    setup_score(ax_w, ax_b, fig, args.title, setname)
     whitewins = sorted([s[1] for s in scores if s[0] < 0.5])
     blackwins = sorted([s[1] for s in scores if s[0] > 0.5])
     plot_score(ax_w, ax_b, whitewins, blackwins)
     plt.tight_layout()
   else:
-    fig, axs = plt.subplots(figsize=(6, 4))  # just one
+    fig, axs = plt.subplots(figsize=fontconfig.ideal_figsize)  # just one
     ax_r = axs
     ratings = ratings[args.setmarker]
     print(f"Preparing {setname} ratings...")

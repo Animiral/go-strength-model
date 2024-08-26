@@ -14,12 +14,13 @@ def read_losses(filename):
         losses = [tuple(float(token) for token in line.split(',')) for line in file]
     return losses
 
-def setup(ax, epochs=0):
+def setup(ax, epochs=0, title=None):
     if epochs:
         ax.set_xlim(0, epochs)
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Loss")
-    ax.set_title("Training and Validation Loss")
+    pretitle = f"{title}: " if title is not None else ""
+    ax.set_title(f"{pretitle}Training and Validation Loss")
 
 def plot(ax, trainlosses, testlosses):
     """Draw the plot data in the given axis"""
@@ -49,12 +50,20 @@ def plot(ax, trainlosses, testlosses):
 if __name__ == "__main__":
     trainlossfile = sys.argv[1]
     testlossfile = sys.argv[2]
+    if 4 == len(sys.argv):
+        title = sys.argv[3]
+    else:
+        title = None
+
+    if title:
+        print(f"Title: {title}")
     print(f"Read train loss from {trainlossfile}, validation loss from {testlossfile}.")
+
     trainlosses = read_losses(trainlossfile)
     testlosses = read_losses(testlossfile)
 
-    fig = plt.figure(figsize=(6.4, 4.8))
+    fig = plt.figure(figsize=fontconfig.ideal_figsize)
     ax = fig.add_subplot(111)
-    setup(ax)
+    setup(ax, title=title)
     plot(ax, trainlosses, testlosses)
     plt.show()

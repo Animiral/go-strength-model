@@ -19,6 +19,8 @@ python3 python/analyzedataset.py rating csv/games_labels.csv featurecache csv/ra
 python3 python/plots/ratings.py csv/rating.csv
 ```
 
+Somewhat related, the command `analyzedataset.py basics path/to/games.csv x y` (with two dummy arguments) prints the total number of games and the number of white wins (Score=0).
+
 # Points Loss Overview
 
 This plot shows the a-priori distribution of points loss per move with different ranking categories.
@@ -26,7 +28,7 @@ First, get the rating labels and points loss for every move in the training data
 
 ```
 python3 python/analyzedataset.py loss_rating csv/games_labels.csv featurecache csv/loss_rating.csv
-python3 plots/ploss_rating.py csv/loss_rating.csv
+python3 python/plots/ploss_rating.py csv/loss_rating.csv
 ```
 # Winrate Loss Overview
 
@@ -57,7 +59,7 @@ It sources its data from the result as described in the main README, Section “
 The first plot shows how the rating *deviation* develops over games. The second plot shows histograms of the rating distribution over games.
 
 ```
-python3 plots/deviation.py csv/games_glicko.csv
+python3 python/plots/deviation.py csv/games_glicko.csv
 ```
 
 # Model vs Label
@@ -68,7 +70,7 @@ It sources its data from the result as described in the main README. The input C
 The second parameter to the script just gives it a model name to use in the figure title.
 
 ```
-python3 plots/estimate_vs_label.py --setmarker E csv/games_glicko.csv Glicko-2
+python3 python/plots/estimate_vs_label.py --setmarker E csv/games_glicko.csv Glicko-2
 ```
 
 With the optional `--scoredist` switch, the script produces a different, 2-subfigure plot that shows the distribution of games where the outcome was predicted correctly or incorrectly by the model.
@@ -78,7 +80,7 @@ With the optional `--scoredist` switch, the script produces a different, 2-subfi
 These are plots of the strength model network's internal values: layer outputs, activations and gradients. Then a plot of the network's output distribution, compared to the training label distribution.
 
 ```
-python3 plots/netvis.py csv/games_labels.csv featurecache --net nets/model.pth --index 10 --featurename pick
+python3 python/plots/netvis.py csv/games_labels.csv featurecache --net nets/model.pth --index 10 --featurename pick
 ```
 
 If the `--net` parameter is unspecified, the net will be randomly initialized.
@@ -90,10 +92,10 @@ The optional `--featurename` parameter indicates which feature type from the dat
 During training, the progress is recorded as training loss (once every step) and validation loss (once every epoch). 
 This data is usually (if following the commands as laid out in README.txt) stored under `logs/`, in files with `trainloss` and `validationloss` in their name.
 
-The plot script `trainingprogress.py` reads a `trainloss` and a `validationloss` file and draws them.
+The plot script `trainingprogress.py` reads a `trainloss` and a `validationloss` file and draws them. An optional third parameter determines the prefix in the figure title.
 
 ```
-python3 plots/trainingprogress.py logs/trainloss.txt logs/validationloss.txt
+python3 python/plots/trainingprogress.py logs/trainloss.txt logs/validationloss.txt "Experiment Model"
 ```
 
 # Hyperparameter Search Visualization
@@ -102,7 +104,7 @@ The hyperparameter search runs multiple trainings, looking for the best hyperpar
 The script `plots/search.py` shows the performance as a series of plots, one for every hyperparameter.
 
 ```
-python3 plots/search.py --zoom path/to/search/logs
+python3 python/plots/search.py --zoom path/to/search/logs
 ```
 
 The optional `--zoom` parameter restricts the y-axis to the range 0.578-0.59, showing only the more promising training runs. Especially in iteration 1, some results can be useless outliers that squish the better models at the bottom of the plot.
@@ -112,7 +114,7 @@ The optional `--zoom` parameter restricts the y-axis to the range 0.578-0.59, sh
 For visualizing the ratings determined by the strength model of the various trick play failure lines and refutations, the script `trickratings.py` creates a plot of their distribution.
 
 ```
-python3 plots/trickratings.py csv/trickratings.csv
+python3 python/plots/trickratings.py csv/trickratings.csv
 ```
 
 The input file `trickratings.csv` must be either used as it is in this repository, or manually constructed from the output of `run.py` over extracted trick line features. The process for this is described in the main `README`.
