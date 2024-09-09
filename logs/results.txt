@@ -17,16 +17,16 @@ Evaluation of Glicko-2:
 
 $ python3 python/calc_performance.py csv/games_glicko.csv -m T
 Finished counting run of 10000 matchups between 312615 players.
-Prediction accuracy: 8969/10000 (0.897), logp: -0.3946167739417872
+Prediction accuracy: 8969/10000 (0.897), logp: -0.3984007313789274
 $ python3 python/calc_performance.py csv/games_glicko.csv -m V
 Finished counting run of 5000 matchups between 312615 players.
-Prediction accuracy: 3432/5000 (0.686), logp: -0.583111561484257
+Prediction accuracy: 3432/5000 (0.686), logp: -0.5818804019889202
 $ python3 python/calc_performance.py csv/games_glicko.csv -m E
 Finished counting run of 5000 matchups between 312615 players.
-Prediction accuracy: 3457/5000 (0.691), logp: -0.5757146575992458
+Prediction accuracy: 3457/5000 (0.691), logp: -0.5752063615671849
 $ python3 python/calc_performance.py csv/games_glicko.csv -m X
 Finished counting run of 5000 matchups between 312615 players.
-Prediction accuracy: 3221/5000 (0.644), logp: -0.658787704455395
+Prediction accuracy: 3221/5000 (0.644), logp: -0.6415356177444471
 
 Evaluation of Future Glicko-2:
 
