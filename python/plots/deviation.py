@@ -15,31 +15,12 @@ import random
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from scipy.stats import gaussian_kde
+from rank import *
 import fontconfig
 
 max_age_dev = 50  # for deviation
 max_age_ranks = 15  # for rank distribution
 num_samples = 20  # per age group
-
-def to_rank(rating):
-  # 654  = 25k, rank(654) = 5
-  # 962  = 16k, rank(962) = 14
-  # 1005 = 15k, rank(1005) = 15
-  # 1246 = 10k, rank(1246) = 20
-  # 1919 = 1d,  rank(1919) = 30
-  return np.log(rating / 525) * 23.15  # from https://forums.online-go.com/t/2021-rating-and-rank-adjustments/33389
-
-def to_rating(rank):
-  return np.exp(rank / 23.15) * 525
-
-def rankstr(rank):
-  # 654==25.0k, 30==1.0d
-  if rank < 30:
-    kyu = min(30 - rank, 30);
-    return f'{kyu}-kyu'
-  else:
-    dan = min(rank - 29, 9);
-    return f'{dan}-dan'
 
 def read_csv(path):
   global max_age_dev
@@ -132,9 +113,18 @@ def plot_ratings(hist):
   rank_ticks = np.array([10, 15, 20, 25, 30, 34, 38])
   axes.set_yticks(rank_ticks)
   axes.set_ylim(9, 39)
-  axes.set_yticklabels(rankstr(r) for r in rank_ticks)
-  plt.xlabel('Games')
-  plt.ylabel('Rank')
+  axes.set_yticklabels(rankintstr(r) for r in rank_ticks)
+
+  # rating axis
+  rating_axis = axes.twinx()
+  rating_ticks = [to_rating(r) for r in rank_ticks]
+  rating_axis.set_yticks(rank_ticks)
+  rating_axis.set_ylim(axes.get_ylim()[0], axes.get_ylim()[1])
+  rating_axis.set_yticklabels(f'{r:.0f}' for r in rating_ticks)
+  rating_axis.set_ylabel('Rating')
+
+  axes.set_xlabel('Games')
+  axes.set_ylabel('Rank')
   plt.title('Rank Distribution Over Time')
   # plt.legend()
   plt.show()
