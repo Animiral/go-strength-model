@@ -532,6 +532,14 @@ $ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker V
 $ python3 python/recentmoves.py "$LISTFILE" "$FEATUREDIR" --marker E
 ```
 
+## Determine Strength Model Error
+
+This script produces data to estimate the error of the strength model for every different size of input set. Model outputs are compared to the game labels, and this is done taking just the latest `i` recent moves up to the window size `N`. It writes the raw data to the optional file given in the `samplespath` argument and prints the estimated variance and standard deviation for each move count to stdout.
+
+```
+$ python3 python/model/deviation.py csv/games_labels.csv featurecache nets/search2/model.pth --samplespath logs/modeldeviation.txt
+```
+
 ## Stochastic Model Calculation Implemented in C++
 
 TThis implementation of the Stochastic model is obsolete. The Stochastic Model is a simple idea that we can predict winning chances based on the expected points loss of both players in their match.
