@@ -4,6 +4,7 @@
 import argparse
 import subprocess
 import sys
+import re
 import tempfile
 import torch
 from moves_dataset import load_features_from_zip, scale_rating
@@ -14,6 +15,59 @@ device = "cuda"
 
 class KatagoException(Exception):
     pass
+
+class PlayerDetectException(Exception):
+    pass
+
+def readName(sgfText, color):
+    pattern = "P" + color + r"\[((?:[^\\\]]|\\.)*)\]"  # tolerate escaping
+    match = re.search(pattern, sgfText)
+    if not match:
+        raise PlayerDetectException(f"Name for color {color} not specified in SGF.")
+    name = match.group(1)
+    name = re.sub(r"\\(.)", r"\1", name)  # unescape
+    return name
+
+def readNames(sgfPath):
+    """Return the name of the black and the white player, or fail with PlayerDetectException."""
+    with open(sgfPath, "r") as file:
+        text = file.read()
+    black_name = readName(text, "B")
+    white_name = readName(text, "W")
+    return black_name, white_name
+
+def findOmnipresentPlayer(names):
+    """From a list of tuples, return the name that appears in every tuple, or fail with PlayerDetectException."""
+    if 0 == len(names):
+        raise PlayerDetectException(f"No input games.")
+
+    candidate = names[0][0]
+    alt = names[0][1]
+
+    for i in range(1, len(names)):
+        black = names[i][0]
+        white = names[i][1]
+
+        if black != alt and white != alt:
+            alt = ""
+
+        if black == candidate or white == candidate:
+            continue
+        elif black == alt or white == alt:
+            candidate = alt
+            alt = ""
+        else:
+            raise PlayerDetectException("Could not determine unique player name.")
+
+    if alt:
+        raise PlayerDetectException(f"Player name ambiguous: '{candidate}' or '{alt}'")
+    else:
+        return candidate
+
+def findOmnipresentPlayerInFiles(sgfs):
+    """Auto-detect player name or raise PlayerDetectException."""
+    names = [readNames(sgf) for sgf in sgfs]
+    return findOmnipresentPlayer(names)
 
 def main(args):
     inputs = args["inputs"]
@@ -45,6 +99,14 @@ def main(args):
     print(f"Device: {device}")
 
     if sgfs:
+        names = [readNames(sgf) for sgf in sgfs]
+
+        if playername:  # ensure that all SGFs have this player
+            if not all(b == playername or w == playername for (b, w) in names):
+                raise PlayerDetectException(f"Player {playername} must occur in all SGF records.")
+        else:  # auto-detect
+            playername = findOmnipresentPlayer(names)
+
         with tempfile.NamedTemporaryFile(suffix='.zip') as outFile:
             print(f"Feature file: {outFile.name}")
             print(f"Executing katago...")
@@ -93,9 +155,6 @@ def katago(binPath: str, modelPath: str, configPath: str, sgfFiles: list[str], o
     playerNameArg = ["-playername", playerName] if playerName else ["-autodetect"]
     command = [binPath, "extract_sgfs"] + sgfFiles + ["-model", modelPath, "-config", configPath, "-outfile", outFile, selection] + playerNameArg
 
-    # temp debug
-    print("kata cmd: " + " ".join(command))
-
     with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as process:
         for line in process.stdout:
             print(line, end="", file=sys.stdout)
@@ -134,3 +193,33 @@ if __name__ == "__main__":
 
     args = vars(parser.parse_args())
     main(args)
+
+
+# unit tests on a budget
+def tests():
+    sgftext = r"DT[2023-10-07]PB[p\1\]]BR[1D]PW[\\p2\\]WR[2D]EV"
+    assert "p1]" == readName(sgftext, "B")
+    assert "\\p2\\" == readName(sgftext, "W")
+
+    names = [("aa", "bb"), ("bb", "aa"), ("cc", "aa")]
+    assert "aa" == findOmnipresentPlayer(names)
+
+    try:
+        findOmnipresentPlayer([])
+        assert False
+    except PlayerDetectException:
+        pass
+
+    try:
+        findOmnipresentPlayer([("aa", "bb"), ("bb", "aa")])
+        assert False
+    except PlayerDetectException:
+        pass
+
+    try:
+        findOmnipresentPlayer([("aa", "bb")])
+        assert False
+    except PlayerDetectException:
+        pass
+
+# tests()
