@@ -87,8 +87,7 @@ def findRuns(directory: str):
   
   return pd.DataFrame(runs)
 
-def plot(df, zoom: bool = False):
-  paramnames = [c for c in df.columns if c not in ["vloss", "iteration"]]
+def plot(df, zoom: bool = False, presentation: bool = False):
   titles = {
     "learningrate": "Learning Rate",
     "lrdecay": "Learning Rate Decay",
@@ -101,7 +100,22 @@ def plot(df, zoom: bool = False):
     "N": "Window Size"
   }
 
-  fig, axs = plt.subplots(4, 2, figsize=fontconfig.big_figsize) # figsize=(20, 10))
+  if presentation:
+    paramnames = [c for c in df.columns if c in ["learningrate", "depth", "hiddenDims", "queryDims"]]
+    figsize = fontconfig.presentation_figsize
+    rows = 2
+    markersize = 10
+    linewidth = 0.5
+    plt.rcParams.update({"font.size": 8})
+    plt.rcParams.update({"font.family": "Gillius ADF"})
+    plt.rcParams.update({"text.usetex": False})
+  else:
+    paramnames = [c for c in df.columns if c not in ["vloss", "iteration"]]
+    figsize = fontconfig.big_figsize
+    rows = 4
+    markersize = 36
+    linewidth = 1.5
+  fig, axs = plt.subplots(rows, 2, figsize=figsize) # figsize=(20, 10))
   axs = axs.ravel()
 
   # colormap = plt.colormaps["tab10"]
@@ -112,7 +126,7 @@ def plot(df, zoom: bool = False):
   for i, param in enumerate(paramnames):
     ax = axs[i]
     for idx, row in df.iterrows():
-      ax.scatter(row[param], row["vloss"], edgecolors=colors[idx], facecolors="none", marker=shapes[row["iteration"]])
+      ax.scatter(row[param], row["vloss"], edgecolors=colors[idx], facecolors="none", marker=shapes[row["iteration"]], s=markersize, linewidth=linewidth)
 
     # ax.set_title(f"{titles[param]}")
     ax.set_xlabel(f"{titles[param]}")
@@ -120,10 +134,18 @@ def plot(df, zoom: bool = False):
       ax.set_ylabel("Min Validation Loss")
     if zoom:
       ax.set_ylim(0.578, 0.59)  # optional: hide outliers
+    if presentation:
+      ax.tick_params(axis="y", labelsize=6)
+      if i % 2 == 1:
+        # We take some liberties with the axis labels to save even more slide space
+        ax.set_ylabel("")
+        ax.set_yticks([])
+        ax.set_yticklabels([])
 
     if param == "learningrate":
       ax.set_xscale("log")
-      # ax.set_xlim(0, 0.01)
+      if zoom:
+        ax.set_xlim(0, 0.004)
     if param == "depth":
       ax.set_xticks([1, 2, 3, 4, 5])
 
@@ -141,10 +163,11 @@ if __name__ == "__main__":
   """
   parser = argparse.ArgumentParser(description=description)
   parser.add_argument("-z", "--zoom", action="store_true", help="Restrict the y-axis to good candidates.")
+  parser.add_argument("-p", "--presentation", action="store_true", help="Create the alternative version for the seminar presentation.")
   parser.add_argument("logdir", type=str, help="Path to the log directory of the hyperparameter search.")
   args = parser.parse_args()
   print(vars(args))
 
   df = findRuns(args.logdir)
   print("Preparing plots...")
-  plot(df, args.zoom)
+  plot(df, args.zoom, args.presentation)
