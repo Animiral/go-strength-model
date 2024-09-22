@@ -40,15 +40,16 @@ def read_csv(path):
 def setup_ratings(ax, modelname: str = "Model", setname: str = "Set"):
   ax.set_xlabel("Rating")
   ax.set_ylabel("Model")
-  ax.set_title(f"{modelname} vs Labels in {setname}")
+  if modelname is not None:
+    ax.set_title(f"{modelname} vs Labels in {setname}")
 
-def plot_ratings(ax, x, y):
+def plot_ratings(ax, x, y, ptcolor="#1f77b4", linecolor="tab:cyan"):
   minx = min(x) - 50
   maxx = max(x) + 50
   ax.set_xlim(minx, maxx)
   ax.set_ylim(minx, maxx)
-  ax.scatter(x, y, alpha=0.1)
-  ax.plot([minx, maxx], [minx, maxx], linestyle="--", color="tab:cyan")
+  ax.scatter(x, y, c=ptcolor, alpha=0.1)
+  ax.plot([minx, maxx], [minx, maxx], linestyle="--", color=linecolor)
 
 def setup_score(ax_white, ax_black, fig=None, modelname="Model", setname="Set"):
   if fig is not None:
@@ -78,6 +79,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser(description=description)
   parser.add_argument("-m", "--setmarker", type=str, default="E", help="Marker of the set to plot (T/V/E/X).")
   parser.add_argument("-s", "--scoredist", action="store_true", help="Plot the score distribution.")
+  parser.add_argument("-p", "--presentation", action="store_true", help="Create the alternative version for the seminar presentation.")
   parser.add_argument("path", type=str, help="Path to the dataset list CSV file.")
   parser.add_argument("title", type=str, default="Model", help="Name of the evaluated function for plot title.")
   args = parser.parse_args()
@@ -91,26 +93,40 @@ if __name__ == "__main__":
   ratings, scores = read_csv(args.path)
   setname = {"T": "Training Set", "V": "Validation Set", "E": "Test Set", "X": "Exhibition Set"}[args.setmarker]
 
+  if args.presentation:
+    figsize = fontconfig.presentation_figsize
+    plt.rcParams.update({"font.family": "Gillius ADF"})
+    plt.rcParams.update({"text.usetex": False})
+    modelname = None
+    ptcolor = "#3C5046"
+    linecolor = "#7D9D8D"
+  else:
+    figsize = fontconfig.ideal_figsize
+    modelname = args.title
+    ptcolor = "#1f77b4"
+    linecolor = "tab:cyan"
+
   if args.scoredist:
-    fig, axs = plt.subplots(1, 2, figsize=fontconfig.ideal_figsize)  # two
+    fig, axs = plt.subplots(1, 2, figsize=figsize)  # two
     ax_w = axs[0]
     ax_b = axs[1]
     scores = scores[args.setmarker]
     print(f"Preparing {setname} scores...")
 
-    setup_score(ax_w, ax_b, fig, args.title, setname)
+    setup_score(ax_w, ax_b, fig, modelname, setname)
     whitewins = sorted([s[1] for s in scores if s[0] < 0.5])
     blackwins = sorted([s[1] for s in scores if s[0] > 0.5])
     plot_score(ax_w, ax_b, whitewins, blackwins)
     plt.tight_layout()
   else:
-    fig, axs = plt.subplots(figsize=fontconfig.ideal_figsize)  # just one
+    fig, axs = plt.subplots(figsize=figsize)  # just one
     ax_r = axs
     ratings = ratings[args.setmarker]
     print(f"Preparing {setname} ratings...")
 
-    setup_ratings(ax_r, args.title, setname)
+    setup_ratings(ax_r, modelname, setname)
     x, y = zip(*ratings)
-    plot_ratings(ax_r, x, y)
+    plot_ratings(ax_r, x, y, ptcolor=ptcolor, linecolor=linecolor)
+    plt.tight_layout()
 
   plt.show()
