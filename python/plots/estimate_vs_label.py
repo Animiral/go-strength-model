@@ -94,7 +94,11 @@ if __name__ == "__main__":
   setname = {"T": "Training Set", "V": "Validation Set", "E": "Test Set", "X": "Exhibition Set"}[args.setmarker]
 
   if args.presentation:
-    figsize = fontconfig.presentation_figsize
+    if args.scoredist:
+      figsize = fontconfig.presentation_figsize
+    else:
+      plt.rcParams.update({"font.size": 20})
+      figsize = fontconfig.presentation_pngsize  # due to many data points, we prerender this slide, it's faster
     plt.rcParams.update({"font.family": "Gillius ADF"})
     plt.rcParams.update({"text.usetex": False})
     modelname = None
