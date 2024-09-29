@@ -1,0 +1,2 @@
+All Python code in this repository may be used under the terms of the GNU General Public License, version 3, or any later version. Refer to the file LICENSE-GPLv3.
+All C++ code in this repository, specifically the *datasetviewer* and *extractor*, may be used under the terms of the MIT license. These programs use code adapted/repurposed from KataGo by David Wu, also under MIT license. Refer to the file LICENSE-MIT.
