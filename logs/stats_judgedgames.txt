@@ -1,0 +1,9 @@
+Read games list from csv/games_7M.csv
+Read judged games list from csv/games_judged.csv
+Games: 7049004 total (6986379/99.11% judged, 62625/0.89% omitted)
+Flipped: 553821 (7.93%)
+  black-to-white 312129 (56.36%)
+  white-to-black 241692 (43.64%)
+  after counting 41538 (7.50%)
+  after timeout 269608 (48.68%)
+  after resignation 242675 (43.82%)
