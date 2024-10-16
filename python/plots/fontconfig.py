@@ -8,6 +8,7 @@ rcParams["text.latex.preamble"] = r"\usepackage{amsmath}"
 
 # this will fit in thesis without latex warnings
 ideal_figsize = (5.75, 4.2)
+ideal_pngsize = (11.5, 8.4)  # larger size for PNG figures
 big_figsize = (8, 11)  # whole page figure, e.g. hp search
 presentation_figsize = (4.2, 2.8)  # fits latex beamer 4:3 with title
 presentation_pngsize = (12.6, 6)  # larger size for PNG figure in presentation

@@ -40,7 +40,7 @@ def plot(ax, trainlosses, testlosses):
 
     if len(trainlosses) > 1:
         ax.fill_between(trainlabels, lt_s, color='lightblue', label="Training Score Loss")
-        ax.fill_between(trainlabels, lt_mid, lt_s, color='mediumblue', label="Training Ratings Loss")
+        ax.fill_between(trainlabels, lt_mid, lt_s, color='#0A9EF8', label="Training Ratings Loss")
         ax.fill_between(trainlabels, lt, lt_mid, color='darkblue', label="Training Regularization Loss")
     ax.plot(testlabels, lv_s, color='red', linewidth=2, label="Validation Score Loss")
     ax.plot(testlabels, lv_r, color='orange', linewidth=2, label="Validation Ratings Loss")

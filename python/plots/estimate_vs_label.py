@@ -43,12 +43,12 @@ def setup_ratings(ax, modelname: str = "Model", setname: str = "Set"):
   if modelname is not None:
     ax.set_title(f"{modelname} vs Labels in {setname}")
 
-def plot_ratings(ax, x, y, ptcolor="#1f77b4", linecolor="tab:cyan"):
+def plot_ratings(ax, x, y, ptcolor="#1f77b4", linecolor="tab:cyan", markersize=36):
   minx = min(x) - 50
   maxx = max(x) + 50
   ax.set_xlim(minx, maxx)
   ax.set_ylim(minx, maxx)
-  ax.scatter(x, y, c=ptcolor, alpha=0.1)
+  ax.scatter(x, y, c=ptcolor, s=markersize, alpha=0.1)
   ax.plot([minx, maxx], [minx, maxx], linestyle="--", color=linecolor)
 
 def setup_score(ax_white, ax_black, fig=None, modelname="Model", setname="Set"):
@@ -57,19 +57,19 @@ def setup_score(ax_white, ax_black, fig=None, modelname="Model", setname="Set"):
 
   ax_white.set_facecolor("beige")
   ax_white.set_xticks([])
-  ax_white.set_ylabel("Est.Score")
-  ax_white.set_title(f"White Wins", fontsize=12)
+  ax_white.set_ylabel("Est.~Score")
+  ax_white.set_title(f"White Wins", fontsize=ax_white.yaxis.label.get_size() + 2)
 
   ax_black.set_facecolor("dimgray")
   ax_black.set_xticks([])
-  ax_black.set_ylabel("Est.Score")
-  ax_black.set_title(f"Black Wins", fontsize=12)
+  ax_black.set_ylabel("Est.~Score")
+  ax_black.set_title(f"Black Wins", fontsize=ax_black.yaxis.label.get_size() + 2)
 
-def plot_score(ax_white, ax_black, whitewins, blackwins):
+def plot_score(ax_white, ax_black, whitewins, blackwins, markersize=36):
   colors_white = plt.cm.RdYlGn_r(whitewins)
   colors_black = plt.cm.RdYlGn(blackwins)
-  ax_white.scatter(range(len(whitewins)), whitewins, color=colors_white, label="White Wins", alpha=0.1)
-  ax_black.scatter(range(len(blackwins)), blackwins, color=colors_black, label="Black Wins", alpha=0.1)
+  ax_white.scatter(range(len(whitewins)), whitewins, color=colors_white, label="White Wins", s=markersize, alpha=0.1)
+  ax_black.scatter(range(len(blackwins)), blackwins, color=colors_black, label="Black Wins", s=markersize, alpha=0.1)
 
 if __name__ == "__main__":
   description = """
@@ -104,11 +104,14 @@ if __name__ == "__main__":
     modelname = None
     ptcolor = "#3C5046"
     linecolor = "#7D9D8D"
+    markersize = 36
   else:
-    figsize = fontconfig.ideal_figsize
+    plt.rcParams.update({"font.size": 20})  # printers cannot handle the many data points, so we prerender these figures
+    figsize = fontconfig.ideal_pngsize
     modelname = args.title
     ptcolor = "#1f77b4"
     linecolor = "tab:cyan"
+    markersize = 72
 
   if args.scoredist:
     fig, axs = plt.subplots(1, 2, figsize=figsize)  # two
@@ -120,7 +123,7 @@ if __name__ == "__main__":
     setup_score(ax_w, ax_b, fig, modelname, setname)
     whitewins = sorted([s[1] for s in scores if s[0] < 0.5])
     blackwins = sorted([s[1] for s in scores if s[0] > 0.5])
-    plot_score(ax_w, ax_b, whitewins, blackwins)
+    plot_score(ax_w, ax_b, whitewins, blackwins, markersize=markersize)
     plt.tight_layout()
   else:
     fig, axs = plt.subplots(figsize=figsize)  # just one
@@ -130,7 +133,7 @@ if __name__ == "__main__":
 
     setup_ratings(ax_r, modelname, setname)
     x, y = zip(*ratings)
-    plot_ratings(ax_r, x, y, ptcolor=ptcolor, linecolor=linecolor)
+    plot_ratings(ax_r, x, y, ptcolor=ptcolor, linecolor=linecolor, markersize=markersize)
     plt.tight_layout()
 
   plt.show()

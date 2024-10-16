@@ -30,7 +30,7 @@ def plot(x, y, mean_x):
   plt.axvline(mean_x, linestyle="--", linewidth=1, zorder=3)
   plt.xlabel("Game Moves")
   plt.ylabel("Count")
-  plt.title("Distribution of Game Moves")
+  plt.title("Distribution of Total Number of Moves per Game")
   plt.show()
 
 if __name__ == "__main__":
